@@ -43,6 +43,7 @@ const state: TrayPanelState = {
     openPanel: "Open panel",
     configTab: "Configuration",
     usageTab: "Usage",
+    quotaWidget: "Usage widget",
     resetsIn: "Resets in {when}",
     durationDays: "{n}d",
     durationHours: "{n}h",

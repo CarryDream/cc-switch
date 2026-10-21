@@ -14,6 +14,7 @@ const texts: PanelTexts = {
   openPanel: "打开快捷面板",
   configTab: "配置",
   usageTab: "用量",
+  quotaWidget: "用量悬浮窗",
   resetsIn: "{when}后重置",
   durationDays: "{n}天",
   durationHours: "{n}小时",

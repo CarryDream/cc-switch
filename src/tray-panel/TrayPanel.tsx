@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ExternalLink,
   Feather,
+  Gauge,
   Plus,
   Power,
   Search,
@@ -1114,6 +1115,12 @@ export function TrayPanel() {
             </span>
           </button>
           <div className="flex">
+            <FooterButton
+              className="flex-1"
+              icon={<Gauge className="h-4 w-4" />}
+              text={texts.quotaWidget}
+              onClick={() => action("widget:toggle")}
+            />
             <FooterButton
               className="flex-1"
               icon={<ExternalLink className="h-4 w-4" />}

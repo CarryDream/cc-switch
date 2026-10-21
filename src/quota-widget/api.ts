@@ -15,6 +15,8 @@ export interface PanelTexts {
   openPanel: string;
   configTab: string;
   usageTab: string;
+  /** 托盘面板底部开关额度悬浮窗（悬浮窗自己不用，字段与后端对齐） */
+  quotaWidget: string;
   /** 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长 */
   resetsIn: string;
   /** 时长单位：`{n}` 是数字；最多取两级，中间用 `durationSep` 隔开 */
