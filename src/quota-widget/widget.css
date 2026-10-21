@@ -1,5 +1,6 @@
-/* 额度悬浮窗：卡片铺满窗口、画布透明，玻璃画法跟平台走（data-glass 由后端回执设置）。
-   三种模式的底色和描边抄托盘面板（tray-panel.css）的同一套数值，观感一致。 */
+/* 额度悬浮窗：无标题栏的极简小卡片，整卡可拖动（data-tauri-drag-region）。
+   画布透明；玻璃画法跟平台走（data-glass 由后端回执设置），比托盘面板透一些：
+   常驻桌面的物件轻一点，文字靠全亮的前景色保读。 */
 html,
 body.quota-widget,
 body.quota-widget #root {
@@ -17,133 +18,134 @@ body.quota-widget {
 .qw-card {
   display: flex;
   flex-direction: column;
-  width: 300px;
-  max-height: 640px;
+  gap: 7px;
+  width: 240px;
+  max-height: 380px;
   overflow: hidden;
-  border-radius: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px;
+  border-radius: 12px;
   color: hsl(var(--foreground));
-  font-size: 12px;
+  font-size: 10px;
+  scrollbar-width: none;
 }
 
-/* Windows 的 DWM 圆角比 14px 小，CSS 跟着收，避免角落露出方形底 */
+/* Windows 的 DWM 圆角比 12px 小，CSS 跟着收，避免角落露出方形底 */
 html[data-platform="windows"] .qw-card {
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
-/* macOS：系统玻璃垫底，网页再叠一层主题底色（玻璃随身后的桌面变深变浅，
-   底色要盖住大半，只透出一点模糊的背景） */
+/* macOS：系统玻璃垫底，网页叠一层淡主题色（比托盘面板透，玻璃感更足） */
 html[data-glass="native"] .qw-card {
-  background: rgba(246, 246, 248, 0.72);
+  background: rgba(246, 246, 248, 0.55);
   box-shadow:
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.12),
-    0 6px 16px rgba(0, 0, 0, 0.14),
-    0 1px 3px rgba(0, 0, 0, 0.1);
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.12);
 }
 html.dark[data-glass="native"] .qw-card {
-  background: rgba(30, 30, 33, 0.62);
+  background: rgba(28, 28, 30, 0.45);
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
-    0 6px 16px rgba(0, 0, 0, 0.3),
-    0 1px 3px rgba(0, 0, 0, 0.2);
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.26);
 }
 
-/* Windows 11：DWM 系统背景（Acrylic）负责整窗模糊，网页只叠一层薄主题色。
+/* Windows 11：DWM 系统背景（Acrylic）负责整窗模糊，网页只叠很薄一层主题色。
    套不上系统背景时后端回报 frosted，落到下面那档。 */
 html[data-glass="acrylic"] .qw-card {
-  background: rgba(244, 244, 247, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  background: rgba(244, 244, 247, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07);
 }
 html.dark[data-glass="acrylic"] .qw-card {
-  background: rgba(28, 28, 31, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  background: rgba(26, 26, 29, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-/* 兼容磨砂：没有可用的系统材质（Linux / 旧 Windows），网页自己画——
-   半透明底色 + 背景模糊 + 顶部高光和细描边 */
+/* 兼容磨砂：没有可用的系统材质（Linux / 旧 Windows），网页自己画。
+   桌面会直接透进来，底色不能太薄，否则文字读不清 */
 html[data-glass="frosted"] .qw-card {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 120px
+      rgba(255, 255, 255, 0.45),
+      rgba(255, 255, 255, 0) 80px
     ),
-    rgba(244, 244, 247, 0.9);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+    rgba(244, 244, 247, 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    inset 0 0 0 1px rgba(0, 0, 0, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 html.dark[data-glass="frosted"] .qw-card {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0) 120px
+      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0) 80px
     ),
-    rgba(36, 36, 40, 0.9);
+    rgba(34, 34, 38, 0.84);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* 标题行：拖动区域 + 关闭 */
-.qw-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 8px 6px 12px;
-}
-
-.qw-close {
-  display: flex;
-  height: 20px;
-  width: 20px;
-  align-items: center;
-  justify-content: center;
-  margin-left: auto;
-  border-radius: 6px;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-}
-.qw-close:hover {
-  background: rgba(0, 0, 0, 0.08);
-  color: hsl(var(--foreground));
-}
-html.dark .qw-close:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-/* 内容滚动区 */
-.qw-body {
+/* 每个应用一行：应用名 + 剩余百分比，下面一条 5 小时进度条；整行悬停出完整说明 */
+.qw-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 12px 10px;
-  scrollbar-width: thin;
+  gap: 3px;
 }
 
-.qw-app + .qw-app {
-  border-top: 1px solid rgba(0, 0, 0, 0.07);
-  padding-top: 8px;
-}
-html.dark .qw-app + .qw-app {
-  border-top-color: rgba(255, 255, 255, 0.08);
+.qw-row-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* 其余供应商的小块 */
-.qw-other {
-  padding: 5px 8px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.04);
-}
-html.dark .qw-other {
-  background: rgba(255, 255, 255, 0.06);
+.qw-app-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9.5px;
+  line-height: 1.2;
+  color: hsl(var(--muted-foreground));
 }
 
-/* 进度条：剩余百分比 */
+.qw-reset {
+  flex-shrink: 0;
+  font-size: 9px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground));
+}
+
+.qw-pct {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 快用完：数值和进度条转琥珀色 */
+.qw-warn {
+  color: #d97706;
+}
+html.dark .qw-warn {
+  color: #fbbf24;
+}
+
+/* 已用尽：数值和进度条转红色 */
+.qw-danger {
+  color: #dc2626;
+}
+html.dark .qw-danger {
+  color: #f87171;
+}
+
 .qw-bar {
   height: 3px;
   border-radius: 9999px;
@@ -153,6 +155,13 @@ html.dark .qw-other {
 html.dark .qw-bar {
   background: rgba(255, 255, 255, 0.14);
 }
+.qw-bar[data-danger="true"] {
+  background: rgba(220, 38, 38, 0.2);
+}
+html.dark .qw-bar[data-danger="true"] {
+  background: rgba(248, 113, 113, 0.25);
+}
+
 .qw-bar-fill {
   height: 100%;
   border-radius: inherit;
@@ -162,37 +171,39 @@ html.dark .qw-bar {
 .qw-bar-fill[data-warn="true"] {
   background: #f59e0b;
 }
-
-/* 快用完的行整行变琥珀色 */
-.qw-warn {
-  color: #d97706;
-}
-html.dark .qw-warn {
-  color: #fbbf24;
-}
-
-/* 还有余额时的金额 */
-.qw-emphasis {
-  color: #059669;
-  font-weight: 600;
-}
-html.dark .qw-emphasis {
-  color: #34d399;
+.qw-bar-fill[data-danger="true"] {
+  background: #ef4444;
 }
 
 /* 需要处理的小圆点（配色同托盘的问题圆点） */
 .qw-attention {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: #f7630c;
-  align-self: center;
+}
+
+/* 没查到额度时的原因（缩成一行小字） */
+.qw-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  line-height: 1.3;
+  color: hsl(var(--muted-foreground));
+}
+
+/* 一个应用都没有 */
+.qw-empty {
+  font-size: 9.5px;
+  color: hsl(var(--muted-foreground));
 }
 
 /* 加载骨架 */
 .qw-skel {
-  height: 10px;
-  border-radius: 5px;
+  height: 8px;
+  border-radius: 4px;
   background: rgba(127, 127, 127, 0.18);
   animation: qw-pulse 1.2s ease-in-out infinite;
 }

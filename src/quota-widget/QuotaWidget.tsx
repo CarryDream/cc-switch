@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   quotaWidgetApi,
+  type AgyQuotaTier,
   type PanelApp,
   type PanelQuota,
   type PanelQuotaLine,
   type PanelTexts,
   type TrayPanelState,
 } from "./api";
-import { formatResetIn } from "./formatReset";
+import { formatResetIn, formatResetWhen } from "./formatReset";
 import { readSavedPosition, savePosition } from "./position";
 import { useWidgetTheme } from "./useWidgetTheme";
 
@@ -21,125 +21,333 @@ const CLOCK_TICK = 30_000;
 /** 尺寸回报、位置保存的去抖。 */
 const REPORT_DEBOUNCE = 80;
 const SAVE_DEBOUNCE = 300;
+/** 双击判定窗口（毫秒）：拖动区域会吞掉系统的 dblclick，自己按 mousedown 间隔认。 */
+const DBLCLICK_MS = 350;
+/** Antigravity 额度多久问一次：每次都是实打实的网络请求，不能跟主刷新一样勤。 */
+const AGY_REFRESH_INTERVAL = 300_000;
 
-/** `emphasis` 是 text 里要上色的那段数值，拆开包一层。 */
-function QuotaLineText({ line }: { line: PanelQuotaLine }) {
-  if (!line.emphasis) return <>{line.text}</>;
-  const at = line.text.indexOf(line.emphasis);
-  if (at < 0) return <>{line.text}</>;
+interface QuotaTarget {
+  key: string;
+  name: string;
+  quota: PanelQuota;
+  attention?: boolean;
+}
+
+/** 主行：5 小时那档优先，没有就退到第一条有百分比或用量信息的行。 */
+function primaryLine(lines: PanelQuotaLine[]): PanelQuotaLine | null {
+  if (!lines || lines.length === 0) return null;
   return (
-    <>
-      {line.text.slice(0, at)}
-      <span className="qw-emphasis">{line.emphasis}</span>
-      {line.text.slice(at + line.emphasis.length)}
-    </>
+    lines.find((line) => line.tier === "five_hour") ??
+    lines.find((line) => line.left != null) ??
+    lines[0]
   );
 }
 
-function QuotaBlock({
-  quota,
+/** Antigravity 额度的档位名（`five_hour` / `seven_day_*` 等）→ 本地档名。 */
+function agyTierLabel(name: string, texts: PanelTexts): string {
+  if (name.includes("five_hour") || name.includes("5h"))
+    return texts.tierFiveHour;
+  if (
+    name.includes("seven_day") ||
+    name === "weekly_limit" ||
+    name.includes("weekly")
+  )
+    return texts.tierWeekly;
+  return name;
+}
+
+/** 悬停说明：供应商名 + 全部档行（每周等都在这里）+ 重置倒计时。 */
+function rowTooltip(
+  name: string,
+  quota: PanelQuota,
+  texts: PanelTexts,
+  now: number,
+): string | undefined {
+  const rows = quota.lines.map((line) => {
+    const reset = line.resetsAt
+      ? formatResetIn(line.resetsAt, now, texts)
+      : null;
+    return reset ? `${line.text} · ${reset}` : line.text;
+  });
+  if (quota.resetCredits != null) {
+    rows.push(
+      texts.resetCredits.replace("{count}", String(quota.resetCredits)),
+    );
+  }
+  return [name, ...rows].filter(Boolean).join("\n") || undefined;
+}
+
+function QuotaRow({
+  target,
   texts,
   now,
 }: {
-  quota: PanelQuota;
+  target: QuotaTarget;
   texts: PanelTexts;
   now: number;
 }) {
-  if (quota.lines.length === 0) {
-    return quota.note ? (
-      <div className="text-[11px] leading-snug text-muted-foreground">
-        {quota.note}
-      </div>
-    ) : null;
-  }
+  const quota = target.quota;
+  const primary = primaryLine(quota.lines);
+  const rawPct = primary?.left;
+  const pct =
+    rawPct != null ? Math.max(0, Math.min(100, Math.round(rawPct))) : null;
+
+  // 用完判定：明确为 0，或文本包含已用尽/用完/used up
+  const isExhausted =
+    pct === 0 ||
+    Boolean(
+      primary?.text.includes("用尽") ||
+        primary?.text.includes("用完") ||
+        primary?.text.toLowerCase().includes("used up"),
+    );
+  const isWarn = Boolean(primary?.warn) && !isExhausted;
+
+  const reset =
+    primary?.resetsAt != null
+      ? formatResetWhen(primary.resetsAt, now, texts)
+      : null;
+
   return (
-    <div className="flex flex-col gap-1.5">
-      {quota.lines.map((line, i) => (
-        <div key={i}>
-          <div className="flex items-baseline gap-2">
-            <span
-              className={cn(
-                "min-w-0 truncate text-[12px] tabular-nums leading-tight",
-                line.warn && "qw-warn",
-              )}
-            >
-              <QuotaLineText line={line} />
-            </span>
-            {line.resetsAt && (
-              <span className="ms-auto shrink-0 whitespace-nowrap text-[10.5px] tabular-nums text-muted-foreground">
-                {formatResetIn(line.resetsAt, now, texts)}
-              </span>
-            )}
-          </div>
-          {line.left != null && (
-            <div className="qw-bar mt-1">
-              <div
-                className="qw-bar-fill"
-                data-warn={line.warn}
-                style={{ width: `${Math.max(3, Math.min(100, line.left))}%` }}
-              />
-            </div>
+    <div
+      className="qw-row"
+      title={rowTooltip(target.name, quota, texts, now)}
+      data-tauri-drag-region
+    >
+      <div className="qw-row-head">
+        {target.attention && (
+          <span className="qw-attention" data-tauri-drag-region />
+        )}
+        <span className="qw-app-name" data-tauri-drag-region>
+          {target.name}
+        </span>
+        {reset && (
+          <span className="qw-reset" data-tauri-drag-region>
+            {reset}
+          </span>
+        )}
+        <span
+          className={cn(
+            "qw-pct",
+            isExhausted ? "qw-danger" : isWarn ? "qw-warn" : undefined,
           )}
+          data-tauri-drag-region
+        >
+          {pct != null ? `${pct}%` : isExhausted ? "0%" : "—"}
+        </span>
+      </div>
+      {pct != null ? (
+        <div
+          className="qw-bar"
+          data-danger={isExhausted}
+          data-tauri-drag-region
+        >
+          <div
+            className="qw-bar-fill"
+            data-warn={isWarn}
+            data-danger={isExhausted}
+            style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
+          />
         </div>
-      ))}
-      {quota.resetCredits != null && (
-        <div className="text-[10.5px] text-muted-foreground">
-          {texts.resetCredits.replace("{count}", String(quota.resetCredits))}
+      ) : quota.note ? (
+        <div className="qw-note" title={quota.note}>
+          {quota.note}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function AppSection({
-  app,
+/** Antigravity 行：托盘额度管线不含 AGY，数据由悬浮窗自己问（见 `quota_widget_agy_quota`）。 */
+function AgyRow({
+  name,
+  primaryTier,
+  allTiers,
   texts,
   now,
 }: {
-  app: PanelApp;
+  name: string;
+  primaryTier: AgyQuotaTier;
+  allTiers: AgyQuotaTier[];
   texts: PanelTexts;
   now: number;
 }) {
-  // 在用那家的额度挂在应用上；子面板里其余查得到额度的供应商各列一小块
-  const others = app.rows.filter(
-    (row) => row.kind === "provider" && row.provider?.quota && !row.checked,
+  const left = Math.max(
+    0,
+    Math.min(100, Math.round(100 - primaryTier.utilization)),
   );
+  const isExhausted = left === 0;
+  const isWarn = left < 20 && !isExhausted;
+  const reset = primaryTier.resetsAt
+    ? formatResetWhen(primaryTier.resetsAt, now, texts)
+    : null;
+
+  const tooltip = [
+    name,
+    ...allTiers.map((tier) => {
+      const tLeft = Math.max(
+        0,
+        Math.min(100, Math.round(100 - tier.utilization)),
+      );
+      const tReset = tier.resetsAt
+        ? formatResetIn(tier.resetsAt, now, texts)
+        : null;
+      const text = `${agyTierLabel(tier.name, texts)} ${tLeft}%`;
+      return tReset ? `${text} · ${tReset}` : text;
+    }),
+  ].join("\n");
+
   return (
-    <section className="qw-app flex flex-col gap-1.5 pt-1.5">
-      <div className="flex items-baseline gap-2">
-        {app.attention && <span className="qw-attention shrink-0" />}
-        <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-          {app.name}
+    <div className="qw-row" title={tooltip} data-tauri-drag-region>
+      <div className="qw-row-head">
+        <span className="qw-app-name" data-tauri-drag-region>
+          {name}
         </span>
-        {app.current && (
-          <span className="min-w-0 truncate text-[12px] font-medium leading-tight">
-            {app.current}
+        {reset && (
+          <span className="qw-reset" data-tauri-drag-region>
+            {reset}
           </span>
         )}
+        <span
+          className={cn(
+            "qw-pct",
+            isExhausted ? "qw-danger" : isWarn ? "qw-warn" : undefined,
+          )}
+          data-tauri-drag-region
+        >
+          {left}%
+        </span>
       </div>
-      {app.quota && <QuotaBlock quota={app.quota} texts={texts} now={now} />}
-      {others.map((row) => (
-        <div key={row.id} className="qw-other flex flex-col gap-1">
-          <span className="truncate text-[11px] leading-tight text-muted-foreground">
-            {row.provider!.name}
-          </span>
-          <QuotaBlock
-            quota={row.provider!.quota!}
-            texts={texts}
-            now={now}
-          />
-        </div>
-      ))}
-    </section>
+      <div
+        className="qw-bar"
+        data-danger={isExhausted}
+        data-tauri-drag-region
+      >
+        <div
+          className="qw-bar-fill"
+          data-warn={isWarn}
+          data-danger={isExhausted}
+          style={{ width: `${Math.max(2, left)}%` }}
+        />
+      </div>
+    </div>
   );
+}
+
+function renderAgyRows(
+  tiers: AgyQuotaTier[] | null,
+  texts: PanelTexts,
+  now: number,
+) {
+  if (!tiers || tiers.length === 0) return null;
+
+  const claude5h = tiers.find(
+    (t) =>
+      t.name === "agy_third_party_five_hour" ||
+      t.name === "third_party_five_hour" ||
+      (t.name.includes("5h") &&
+        (t.name.includes("3p") || t.name.includes("third_party"))),
+  );
+  const gemini5h = tiers.find(
+    (t) =>
+      t.name === "agy_gemini_five_hour" ||
+      t.name === "gemini_five_hour" ||
+      (t.name.includes("5h") && t.name.includes("gemini")),
+  );
+
+  // 如果两者都在，分别渲染 Claude 和 Gemini 两行
+  if (claude5h && gemini5h) {
+    const claudeTiers = tiers.filter(
+      (t) =>
+        t.name.includes("third_party") ||
+        t.name.includes("3p") ||
+        t.name.includes("claude"),
+    );
+    const geminiTiers = tiers.filter((t) => t.name.includes("gemini"));
+    return (
+      <>
+        <AgyRow
+          key="agy-claude"
+          name="Antigravity (Claude)"
+          primaryTier={claude5h}
+          allTiers={claudeTiers.length > 0 ? claudeTiers : tiers}
+          texts={texts}
+          now={now}
+        />
+        <AgyRow
+          key="agy-gemini"
+          name="Antigravity (Gemini)"
+          primaryTier={gemini5h}
+          allTiers={geminiTiers.length > 0 ? geminiTiers : tiers}
+          texts={texts}
+          now={now}
+        />
+      </>
+    );
+  }
+
+  const primary =
+    tiers.find(
+      (t) => t.name.includes("five_hour") || t.name.includes("5h"),
+    ) ?? tiers[0];
+  return (
+    <AgyRow
+      key="agy-single"
+      name="Antigravity"
+      primaryTier={primary}
+      allTiers={tiers}
+      texts={texts}
+      now={now}
+    />
+  );
+}
+
+/** 汇集所有可见的额度目标：当前在用的 + 其它有额度缓存的（哪怕用完了切走了也显示） */
+function collectQuotaTargets(apps: PanelApp[]): QuotaTarget[] {
+  const targets: QuotaTarget[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const app of apps) {
+    // 1. 在用供应商的额度
+    if (app.quota && (app.quota.lines.length > 0 || app.quota.note)) {
+      const key = `${app.app}:current`;
+      seenKeys.add(key);
+      targets.push({
+        key,
+        name: app.name,
+        quota: app.quota,
+        attention: Boolean(app.attention),
+      });
+    }
+
+    // 2. 子面板里其它有额度缓存的供应商（例如当前切到代理/其它模型，但官方卡额度用完仍有记录）
+    for (const row of app.rows) {
+      if (row.kind === "provider" && row.provider?.quota && !row.checked) {
+        const q = row.provider.quota;
+        if (q.lines.length > 0 || q.note) {
+          const key = `${app.app}:${row.id}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            targets.push({
+              key,
+              name: row.provider.name,
+              quota: q,
+              attention: false,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return targets;
 }
 
 function Skeleton() {
   return (
-    <div className="flex flex-col gap-2.5 px-3 pb-3">
-      <div className="qw-skel mt-1 w-2/3" />
+    <div className="flex flex-col gap-2">
+      <div className="qw-skel w-2/3" />
       <div className="qw-skel w-full" />
-      <div className="qw-skel w-5/6" />
+      <div className="qw-skel w-1/2" />
     </div>
   );
 }
@@ -148,7 +356,21 @@ export function QuotaWidget() {
   useWidgetTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TrayPanelState | null>(null);
+  const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const lastDownAt = useRef(0);
+
+  // 双击打开主窗口：mousedown 先于拖动生效，两次点按间隔够近就当双击
+  const onCardMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const at = performance.now();
+    if (at - lastDownAt.current < DBLCLICK_MS) {
+      lastDownAt.current = 0;
+      void quotaWidgetApi.showMain().catch(() => {});
+    } else {
+      lastDownAt.current = at;
+    }
+  };
 
   // 加载完成：摆好存下的位置和首屏尺寸，后端随即显示窗口；拿回玻璃模式选配色
   useEffect(() => {
@@ -157,8 +379,8 @@ export function QuotaWidget() {
     quotaWidgetApi
       .ready(
         readSavedPosition(),
-        el?.offsetWidth ?? 300,
-        el?.offsetHeight ?? 140,
+        el?.offsetWidth ?? 240,
+        el?.offsetHeight ?? 96,
       )
       .then((info) => {
         if (cancelled) return;
@@ -196,7 +418,10 @@ export function QuotaWidget() {
       if (alive) setState(next);
     };
     void load().catch(() => {});
-    const timer = window.setInterval(() => void load().catch(() => {}), REFRESH_INTERVAL);
+    const timer = window.setInterval(
+      () => void load().catch(() => {}),
+      REFRESH_INTERVAL,
+    );
     const onVisible = () => {
       if (document.visibilityState === "visible") void load().catch(() => {});
     };
@@ -212,6 +437,27 @@ export function QuotaWidget() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), CLOCK_TICK);
     return () => window.clearInterval(timer);
+  }, []);
+
+  // Antigravity 的额度：查得到才显示这一行；失败就沿用上一次的，从没成功过就不显示
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const quota = await quotaWidgetApi.agyQuota();
+        if (alive && quota.success && quota.tiers.length > 0) {
+          setAgyTiers(quota.tiers);
+        }
+      } catch {
+        // 没登录 / 查询失败：保持现状
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), AGY_REFRESH_INTERVAL);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   // 内容尺寸变了窗口跟着改（限高，超出卡片内滚动）
@@ -235,35 +481,36 @@ export function QuotaWidget() {
   }, []);
 
   const texts = state?.texts;
+  const quotaTargets = collectQuotaTargets(state?.apps ?? []);
+  const hasAgy = Boolean(agyTiers && agyTiers.length > 0);
+  const isEmpty = quotaTargets.length === 0 && !hasAgy;
 
   return (
-    <div ref={rootRef} className="qw-card">
-      <header className="qw-header" data-tauri-drag-region>
-        <span className="text-[12px] font-semibold" data-tauri-drag-region>
-          {texts?.usageTab ?? "· · ·"}
-        </span>
-        <button
-          type="button"
-          className="qw-close"
-          aria-label="Close"
-          onClick={() => void quotaWidgetApi.hide().catch(() => {})}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </header>
-      <div className="qw-body">
-        {!state || !texts ? (
-          <Skeleton />
-        ) : state.apps.length === 0 ? (
-          <div className="flex h-16 items-center justify-center text-[11px] text-muted-foreground">
-            {texts.noMatch}
-          </div>
-        ) : (
-          state.apps.map((app) => (
-            <AppSection key={app.app} app={app} texts={texts} now={now} />
-          ))
-        )}
-      </div>
+    <div
+      ref={rootRef}
+      className="qw-card"
+      data-tauri-drag-region
+      onMouseDown={onCardMouseDown}
+    >
+      {!state || !texts ? (
+        <Skeleton />
+      ) : isEmpty ? (
+        <div className="qw-empty" data-tauri-drag-region>
+          {texts.noMatch}
+        </div>
+      ) : (
+        <>
+          {quotaTargets.map((target) => (
+            <QuotaRow
+              key={target.key}
+              target={target}
+              texts={texts}
+              now={now}
+            />
+          ))}
+          {renderAgyRows(agyTiers, texts, now)}
+        </>
+      )}
     </div>
   );
 }

@@ -17,6 +17,9 @@ export interface PanelTexts {
   usageTab: string;
   /** 托盘面板底部开关额度悬浮窗（悬浮窗自己不用，字段与后端对齐） */
   quotaWidget: string;
+  /** 档位名（Antigravity 行用） */
+  tierFiveHour: string;
+  tierWeekly: string;
   /** 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长 */
   resetsIn: string;
   /** 时长单位：`{n}` 是数字；最多取两级，中间用 `durationSep` 隔开 */
@@ -37,6 +40,8 @@ export interface PanelQuotaLine {
   resetsAt: string | null;
   /** `text` 里要上绿色的那段数值（还有余额时的金额） */
   emphasis: string | null;
+  /** 机器可读的档位（`five_hour` / `weekly`）；没有档名的为空 */
+  tier: string | null;
 }
 
 export interface PanelQuota {
@@ -97,6 +102,22 @@ export interface WidgetPosition {
   y: number;
 }
 
+/** Antigravity 额度的一档（后端 `subscription::QuotaTier`）。 */
+export interface AgyQuotaTier {
+  /** 窗口标识：five_hour、seven_day、seven_day_opus 等 */
+  name: string;
+  /** 使用百分比 0–100 */
+  utilization: number;
+  /** ISO 8601 重置时间 */
+  resetsAt: string | null;
+}
+
+/** 后端 `subscription::SubscriptionQuota` 里悬浮窗用到的字段。 */
+export interface AgyAccountQuota {
+  success: boolean;
+  tiers: AgyQuotaTier[];
+}
+
 /** 后端 `quota_widget_ready` 的回执：背后是哪种玻璃、什么平台。 */
 export interface WidgetGlass {
   glass: "native" | "acrylic" | "frosted";
@@ -115,4 +136,8 @@ export const quotaWidgetApi = {
   layout: (width: number, height: number) =>
     invoke<void>("quota_widget_layout", { width, height }),
   hide: () => invoke<void>("quota_widget_hide"),
+  /** 双击卡片：打开主窗口 */
+  showMain: () => invoke<void>("quota_widget_show_main"),
+  /** Antigravity 当前登录号的额度（每次都是网络请求，别调太勤） */
+  agyQuota: () => invoke<AgyAccountQuota>("quota_widget_agy_quota"),
 };

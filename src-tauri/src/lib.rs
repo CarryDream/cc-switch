@@ -1727,6 +1727,8 @@ pub fn run() {
             quota_widget::quota_widget_layout,
             quota_widget::quota_widget_refresh,
             quota_widget::quota_widget_hide,
+            quota_widget::quota_widget_show_main,
+            quota_widget::quota_widget_agy_quota,
             tray::tray_app_page_seen,
             commands::exit_proxy_apps_in_mode,
             commands::get_direct_provider,

@@ -178,6 +178,7 @@ describe("TrayPanel window layout", () => {
                 warn: false,
                 resetsAt: null,
                 emphasis: "82.10 CNY",
+                tier: null,
               },
               {
                 text: "Balance used up",
@@ -185,6 +186,7 @@ describe("TrayPanel window layout", () => {
                 warn: true,
                 resetsAt: null,
                 emphasis: null,
+                tier: null,
               },
             ],
             note: null,

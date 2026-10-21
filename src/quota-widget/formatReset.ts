@@ -1,11 +1,11 @@
 import type { PanelTexts } from "./api";
 
 /**
- * 重置倒计时：`{when}` 用 `durationDays / Hours / Minutes` 拼出，最多取两级
- * （天+小时、小时+分），中间用 `durationSep` 隔开——规则与托盘面板一致
- * （`tray-panel/TrayPanel.tsx` 的 `formatResetIn`，独立成份避免带上它的依赖图）。
+ * 重置倒计时的时长部分（「2小时34分」「2h 34m」），单位模板与分隔符由后端文案给出，
+ * 最多取两级（天+小时、小时+分）。规则与托盘面板一致（`tray-panel/TrayPanel.tsx`
+ * 的 `formatResetIn`，独立成份避免带上它的依赖图）。
  */
-export function formatResetIn(
+export function formatResetWhen(
   iso: string,
   now: number,
   texts: PanelTexts,
@@ -20,15 +20,25 @@ export function formatResetIn(
     template.replace("{n}", String(n));
   const parts =
     days > 0
-      ? [unit(texts.durationDays, days), hours > 0 && unit(texts.durationHours, hours)]
+      ? [
+          unit(texts.durationDays, days),
+          hours > 0 && unit(texts.durationHours, hours),
+        ]
       : hours > 0
         ? [
             unit(texts.durationHours, hours),
             minutes > 0 && unit(texts.durationMinutes, minutes),
           ]
         : [unit(texts.durationMinutes, minutes)];
-  return texts.resetsIn.replace(
-    "{when}",
-    parts.filter(Boolean).join(texts.durationSep),
-  );
+  return parts.filter(Boolean).join(texts.durationSep);
+}
+
+/** 完整的重置倒计时句（「2小时34分后重置」）；悬停说明用。 */
+export function formatResetIn(
+  iso: string,
+  now: number,
+  texts: PanelTexts,
+): string | null {
+  const when = formatResetWhen(iso, now, texts);
+  return when === null ? null : texts.resetsIn.replace("{when}", when);
 }

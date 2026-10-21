@@ -21,8 +21,8 @@ pub const WIDGET_TOGGLE_ID: &str = "widget:toggle";
 
 const MIN_WIDTH: f64 = 180.0;
 const MAX_WIDTH: f64 = 480.0;
-const MIN_HEIGHT: f64 = 56.0;
-const MAX_HEIGHT: f64 = 640.0;
+const MIN_HEIGHT: f64 = 40.0;
+const MAX_HEIGHT: f64 = 380.0;
 
 /// 窗口建好后还没显示：等前端回报位置和尺寸（`quota_widget_ready`）再亮相。
 static PENDING_REVEAL: AtomicBool = AtomicBool::new(false);
@@ -43,7 +43,7 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let window =
         WebviewWindowBuilder::new(app, WIDGET_LABEL, WebviewUrl::App("quota-widget.html".into()))
             .title("CC Switch")
-            .inner_size(300.0, 140.0)
+            .inner_size(240.0, 96.0)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)
@@ -254,6 +254,21 @@ pub fn quota_widget_hide(app: AppHandle) {
     hide_widget(&app);
 }
 
+/// 双击悬浮窗打开主窗口（和左键点托盘图标同一条路径）。
+#[tauri::command]
+pub fn quota_widget_show_main(app: AppHandle) {
+    crate::tray::show_main_window(&app);
+}
+
+/// Antigravity 现在登着的号的额度：托盘的额度管线不含 AGY（不在 `TRAY_APPS`），
+/// 悬浮窗自己问。每次都是实打实的网络请求（约 1 秒），前端按几分钟一档的节奏调。
+#[tauri::command]
+pub async fn quota_widget_agy_quota(
+    state: tauri::State<'_, crate::commands::AgyAccountState>,
+) -> Result<crate::services::subscription::SubscriptionQuota, String> {
+    crate::commands::agy_account::agy_quota(&state.0, None).await
+}
+
 // ─── 平台：玻璃 ──────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
@@ -272,7 +287,7 @@ mod platform {
     use tauri::WebviewWindow;
 
     /// 和卡片 CSS 的圆角一致。
-    const RADIUS: f64 = 14.0;
+    const RADIUS: f64 = 12.0;
 
     pub fn glass() -> &'static str {
         "native"

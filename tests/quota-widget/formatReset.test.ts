@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatResetIn } from "@/quota-widget/formatReset";
+import { formatResetIn, formatResetWhen } from "@/quota-widget/formatReset";
 import type { PanelTexts } from "@/quota-widget/api";
 
 const texts: PanelTexts = {
@@ -15,6 +15,8 @@ const texts: PanelTexts = {
   configTab: "配置",
   usageTab: "用量",
   quotaWidget: "用量悬浮窗",
+  tierFiveHour: "5 小时",
+  tierWeekly: "每周",
   resetsIn: "{when}后重置",
   durationDays: "{n}天",
   durationHours: "{n}小时",
@@ -57,5 +59,14 @@ describe("formatResetIn", () => {
     expect(formatResetIn("2026-10-22T12:34:00Z", now, en)).toBe(
       "Resets in 2h 34m",
     );
+  });
+
+  it("纯时长（行内默认显示用）不带「后重置」尾巴", () => {
+    const now = Date.parse("2026-10-22T10:00:00+08:00");
+    expect(formatResetWhen("2026-10-22T12:34:00+08:00", now, texts)).toBe(
+      "2小时34分",
+    );
+    // 已到时间返回空（等下次刷新）
+    expect(formatResetWhen("2026-10-22T09:00:00+08:00", now, texts)).toBeNull();
   });
 });

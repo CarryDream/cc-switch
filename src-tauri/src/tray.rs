@@ -2109,6 +2109,9 @@ pub struct PanelQuotaLine {
     pub resets_at: Option<String>,
     /// `text` 里要上绿色的那段数值（还有余额时的金额）；其余为空。
     pub emphasis: Option<String>,
+    /// 机器可读的档位（`five_hour` / `weekly`）；余额、失败这类没有档名的为空。
+    /// 悬浮窗靠它挑主行：平时只画 5 小时那档，其余档悬停再看。
+    pub tier: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2133,6 +2136,16 @@ pub struct PanelProvider {
     pub quota: Option<PanelQuota>,
 }
 
+/// 从档名反查机器可读的档位（`tier_label` 的逆映射，同一份 `TrayTexts` 不会错位）。
+/// 只标悬浮窗要用的两档，其余档为空。
+fn tier_id(texts: &TrayTexts, label: Option<&'static str>) -> Option<&'static str> {
+    match label {
+        Some(label) if label == texts.tier_five_hour => Some("five_hour"),
+        Some(label) if label == texts.tier_weekly => Some("weekly"),
+        _ => None,
+    }
+}
+
 fn panel_quota(
     texts: &TrayTexts,
     view: &QuotaView,
@@ -2149,6 +2162,7 @@ fn panel_quota(
                     warn: line.left < WARN_BELOW_PERCENT,
                     resets_at: line.resets_at.clone(),
                     emphasis: line.emphasis.clone(),
+                    tier: tier_id(texts, line.label),
                 })
                 .collect(),
             note: None,

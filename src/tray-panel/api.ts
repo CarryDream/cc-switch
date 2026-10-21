@@ -42,6 +42,8 @@ export interface PanelQuotaLine {
   resetsAt: string | null;
   /** `text` 里要上绿色的那段数值（还有余额时的金额） */
   emphasis: string | null;
+  /** 机器可读的档位（`five_hour` / `weekly`）；没有档名的为空。悬浮窗挑主行用 */
+  tier: string | null;
 }
 
 export interface PanelQuota {
