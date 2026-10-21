@@ -84,6 +84,8 @@ pub struct TrayTexts {
     pub show_main: &'static str,
     pub open_website: &'static str,
     pub lightweight_mode: &'static str,
+    /// 托盘菜单里开关额度悬浮窗的一项。
+    pub quota_widget: &'static str,
     pub quit: &'static str,
     /// 有应用在用路由服务时的「退出」：写明后果（客户端指回直连、路由服务停止，下次打开自动接回）。
     pub quit_stops_routing: &'static str,
@@ -189,6 +191,7 @@ impl TrayTexts {
                 show_main: "Open CC Switch",
                 open_website: "Open official website",
                 lightweight_mode: "Lightweight mode",
+                quota_widget: "Usage widget",
                 quit: "Quit CC Switch",
                 quit_stops_routing: "Quit CC Switch (stops the routing service)",
                 projects_label: "Projects",
@@ -249,6 +252,7 @@ impl TrayTexts {
                 texts.show_main = "CC Switch'i aç";
                 texts.open_website = "Resmî web sitesini aç";
                 texts.lightweight_mode = "Hafif mod";
+                texts.quota_widget = "Kullanım widget'ı";
                 texts.quit = "CC Switch'ten çık";
                 texts.quit_stops_routing = "CC Switch'ten çık (yönlendirme hizmeti durur)";
                 texts.projects_label = "Projeler";
@@ -304,6 +308,7 @@ impl TrayTexts {
                 show_main: "CC Switch を開く",
                 open_website: "公式サイトを開く",
                 lightweight_mode: "軽量モード",
+                quota_widget: "使用量ウィジェット",
                 quit: "CC Switch を終了",
                 quit_stops_routing: "CC Switch を終了（ルーティングサービスが停止します）",
                 projects_label: "プロジェクト",
@@ -361,6 +366,7 @@ impl TrayTexts {
                 show_main: "開啟 CC Switch",
                 open_website: "開啟官方網站",
                 lightweight_mode: "輕量模式",
+                quota_widget: "用量懸浮窗",
                 quit: "退出 CC Switch",
                 quit_stops_routing: "退出 CC Switch（路由服務會停止）",
                 projects_label: "專案",
@@ -416,6 +422,7 @@ impl TrayTexts {
                 show_main: "打开 CC Switch",
                 open_website: "打开官方网站",
                 lightweight_mode: "轻量模式",
+                quota_widget: "用量悬浮窗",
                 quit: "退出 CC Switch",
                 quit_stops_routing: "退出 CC Switch（路由服务会停止）",
                 projects_label: "项目",
@@ -1939,6 +1946,10 @@ fn build_menu_model(
         menu.push(TrayEntry::Separator);
     }
 
+    menu.push(TrayEntry::item(
+        crate::quota_widget::WIDGET_TOGGLE_ID,
+        texts.quota_widget,
+    ));
     menu.push(TrayEntry::check(
         "lightweight_mode",
         texts.lightweight_mode,
@@ -3054,6 +3065,7 @@ pub fn handle_tray_menu_event(app: &tauri::AppHandle, event_id: &str) {
             app.exit(0);
         }
         crate::tray_panel::OPEN_PANEL_ID => crate::tray_panel::show_at_cursor(app),
+        crate::quota_widget::WIDGET_TOGGLE_ID => crate::quota_widget::toggle(app),
         _ => {
             if let Some(navigation) = parse_nav_id(event_id) {
                 navigate(app, navigation);
@@ -4149,6 +4161,7 @@ mod tests {
                 "Claude Code · Kimi For Coding",
                 "Grok Build · 添加供应商…",
                 "---",
+                "用量悬浮窗",
                 "轻量模式",
                 "---",
                 "打开官方网站",
@@ -4156,7 +4169,7 @@ mod tests {
             ]
         );
         assert!(matches!(&menu[3], TrayEntry::Item { id, .. } if id == "nav:add:grokbuild"));
-        assert!(matches!(&menu[8], TrayEntry::Item { id, .. } if id == "quit"));
+        assert!(matches!(&menu[9], TrayEntry::Item { id, .. } if id == "quit"));
     }
 
     #[test]

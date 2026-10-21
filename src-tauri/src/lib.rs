@@ -43,6 +43,7 @@ mod session_manager;
 mod settings;
 mod store;
 
+mod quota_widget;
 mod tray;
 mod tray_panel;
 mod usage_events;
@@ -1722,6 +1723,10 @@ pub fn run() {
             tray_panel::tray_panel_layout,
             tray_panel::tray_panel_hide,
             tray_panel::tray_panel_action,
+            quota_widget::quota_widget_ready,
+            quota_widget::quota_widget_layout,
+            quota_widget::quota_widget_refresh,
+            quota_widget::quota_widget_hide,
             tray::tray_app_page_seen,
             commands::exit_proxy_apps_in_mode,
             commands::get_direct_provider,
