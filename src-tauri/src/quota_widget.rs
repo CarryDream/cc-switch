@@ -43,7 +43,7 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let window =
         WebviewWindowBuilder::new(app, WIDGET_LABEL, WebviewUrl::App("quota-widget.html".into()))
             .title("CC Switch")
-            .inner_size(240.0, 96.0)
+            .inner_size(264.0, 110.0)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)

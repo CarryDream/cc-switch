@@ -60,31 +60,58 @@ function tierStatus(left: number): "normal" | "warn" | "danger" {
 }
 
 /**
- * 5 小时 + 周额度的双色进度条：上深下浅两条细轨叠在同一个进度里，
- * 各自按剩余量变色（正常蓝、不足 20% 琥珀、用尽红）。
+ * 统一所有行的进度槽容器（高度严格统一 5px）：
+ * - 双档（5h + 7d）：同槽双层呈现，上层深色 5h，下层浅色周额度
+ * - 单档：同槽 5px 全高实色填充
  */
-function DualBar({ fiveHour, weekly }: { fiveHour: TierBar; weekly: TierBar }) {
-  const width = (t: TierBar) => `${Math.max(2, Math.min(100, t.left))}%`;
-  return (
-    <div className="qw-bar2" data-tauri-drag-region>
-      <div className="qw-track" data-tauri-drag-region>
+function UnifiedBar({
+  dual,
+  pct,
+  isWarn,
+  isExhausted,
+}: {
+  dual?: { fiveHour: TierBar; weekly: TierBar } | null;
+  pct?: number | null;
+  isWarn: boolean;
+  isExhausted: boolean;
+}) {
+  if (dual) {
+    const width5h = `${Math.max(2, Math.min(100, dual.fiveHour.left))}%`;
+    const widthWeekly = `${Math.max(2, Math.min(100, dual.weekly.left))}%`;
+    return (
+      <div className="qw-bar-track" data-tauri-drag-region>
         <div
-          className="qw-fill"
-          data-kind="five_hour"
-          data-status={tierStatus(fiveHour.left)}
-          style={{ width: width(fiveHour) }}
+          className="qw-bar-split qw-bar-5h"
+          data-status={tierStatus(dual.fiveHour.left)}
+          style={{ width: width5h }}
+        />
+        <div
+          className="qw-bar-split qw-bar-weekly"
+          data-status={tierStatus(dual.weekly.left)}
+          style={{ width: widthWeekly }}
         />
       </div>
-      <div className="qw-track" data-tauri-drag-region>
+    );
+  }
+
+  if (pct != null) {
+    return (
+      <div
+        className="qw-bar-track"
+        data-danger={isExhausted}
+        data-tauri-drag-region
+      >
         <div
-          className="qw-fill"
-          data-kind="weekly"
-          data-status={tierStatus(weekly.left)}
-          style={{ width: width(weekly) }}
+          className="qw-bar-fill-full"
+          data-warn={isWarn}
+          data-danger={isExhausted}
+          style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
         />
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
 /** 双档行的瓶颈档：剩余更少的那个（任一用尽时即 0%），即当前真实可用量。 */
@@ -151,9 +178,7 @@ function QuotaRow({
         }
       : null;
 
-  const primary = dual
-    ? null
-    : primaryLine(quota.lines);
+  const primary = dual ? null : primaryLine(quota.lines);
   const pct = dual
     ? bottleneck(dual.fiveHour, dual.weekly).left
     : primary?.left != null
@@ -209,21 +234,13 @@ function QuotaRow({
           {pct != null ? `${pct}%` : isExhausted ? "0%" : "—"}
         </span>
       </div>
-      {dual ? (
-        <DualBar fiveHour={dual.fiveHour} weekly={dual.weekly} />
-      ) : pct != null ? (
-        <div
-          className="qw-bar"
-          data-danger={isExhausted}
-          data-tauri-drag-region
-        >
-          <div
-            className="qw-bar-fill"
-            data-warn={isWarn}
-            data-danger={isExhausted}
-            style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
-          />
-        </div>
+      {dual || pct != null ? (
+        <UnifiedBar
+          dual={dual}
+          pct={pct}
+          isWarn={isWarn}
+          isExhausted={isExhausted}
+        />
       ) : quota.note ? (
         <div className="qw-note" title={quota.note}>
           {quota.note}
@@ -309,22 +326,12 @@ function AgyRow({
           {left}%
         </span>
       </div>
-      {dual ? (
-        <DualBar fiveHour={dual.fiveHour} weekly={dual.weekly} />
-      ) : (
-        <div
-          className="qw-bar"
-          data-danger={isExhausted}
-          data-tauri-drag-region
-        >
-          <div
-            className="qw-bar-fill"
-            data-warn={isWarn}
-            data-danger={isExhausted}
-            style={{ width: `${Math.max(2, left)}%` }}
-          />
-        </div>
-      )}
+      <UnifiedBar
+        dual={dual}
+        pct={left}
+        isWarn={isWarn}
+        isExhausted={isExhausted}
+      />
     </div>
   );
 }
@@ -423,15 +430,14 @@ function collectQuotaTargets(apps: PanelApp[]): QuotaTarget[] {
       seenKeys.add(key);
       targets.push({
         key,
-        // 行名用在用供应商的名字（如自定义的「智谱」），比应用名（Claude Code）
-        // 更能说明这条额度是谁的；没有在用供应商时才退回应用名
+        // 行名用在用供应商的名字（如自定义的「智谱」），比应用名更清晰
         name: app.current ?? app.name,
         quota: app.quota,
         attention: Boolean(app.attention),
       });
     }
 
-    // 2. 子面板里其它有额度缓存的供应商（例如当前切到代理/其它模型，但官方卡额度用完仍有记录）
+    // 2. 子面板里其它有额度缓存的供应商
     for (const row of app.rows) {
       if (row.kind === "provider" && row.provider?.quota && !row.checked) {
         const q = row.provider.quota;
@@ -466,6 +472,7 @@ function Skeleton() {
 
 export function QuotaWidget() {
   useWidgetTheme();
+  const stageRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TrayPanelState | null>(null);
   const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
@@ -500,12 +507,12 @@ export function QuotaWidget() {
   // 加载完成：摆好存下的位置和首屏尺寸，后端随即显示窗口；拿回玻璃模式选配色
   useEffect(() => {
     let cancelled = false;
-    const el = rootRef.current;
+    const stage = stageRef.current;
     quotaWidgetApi
       .ready(
         readSavedPosition(),
-        el?.offsetWidth ?? 240,
-        el?.offsetHeight ?? 96,
+        stage?.offsetWidth ?? 264,
+        stage?.offsetHeight ?? 110,
       )
       .then((info) => {
         if (cancelled) return;
@@ -564,7 +571,7 @@ export function QuotaWidget() {
     return () => window.clearInterval(timer);
   }, []);
 
-  // Antigravity 的额度：查得到才显示这一行；失败就沿用上一次的，从没成功过就不显示
+  // Antigravity 的额度：Windows 现已直读凭据管理器向 Google 查，查得到才显示这一行
   useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -585,20 +592,20 @@ export function QuotaWidget() {
     };
   }, []);
 
-  // 内容尺寸变了窗口跟着改（限高，超出卡片内滚动）
+  // 舞台尺寸变了窗口跟着改（ResizeObserver 监听外层 stage，包含阴影羽化空间，防止桌面投影被裁切）
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
+    const stage = stageRef.current;
+    if (!stage) return;
     let timer: number | undefined;
     const observer = new ResizeObserver(() => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         void quotaWidgetApi
-          .layout(el.offsetWidth, el.offsetHeight)
+          .layout(stage.offsetWidth, stage.offsetHeight)
           .catch(() => {});
       }, REPORT_DEBOUNCE);
     });
-    observer.observe(el);
+    observer.observe(stage);
     return () => {
       observer.disconnect();
       window.clearTimeout(timer);
@@ -611,34 +618,36 @@ export function QuotaWidget() {
   const isEmpty = quotaTargets.length === 0 && !hasAgy;
 
   return (
-    <div
-      ref={rootRef}
-      className="qw-card"
-      data-tauri-drag-region
-      data-active={isHovered || isFocused}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onMouseDown={onCardMouseDown}
-    >
-      {!state || !texts ? (
-        <Skeleton />
-      ) : isEmpty ? (
-        <div className="qw-empty" data-tauri-drag-region>
-          {texts.noMatch}
-        </div>
-      ) : (
-        <>
-          {quotaTargets.map((target) => (
-            <QuotaRow
-              key={target.key}
-              target={target}
-              texts={texts}
-              now={now}
-            />
-          ))}
-          {renderAgyRows(agyTiers, texts, now)}
-        </>
-      )}
+    <div ref={stageRef} className="qw-stage">
+      <div
+        ref={rootRef}
+        className="qw-card"
+        data-tauri-drag-region
+        data-active={isHovered || isFocused}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={onCardMouseDown}
+      >
+        {!state || !texts ? (
+          <Skeleton />
+        ) : isEmpty ? (
+          <div className="qw-empty" data-tauri-drag-region>
+            {texts.noMatch}
+          </div>
+        ) : (
+          <>
+            {quotaTargets.map((target) => (
+              <QuotaRow
+                key={target.key}
+                target={target}
+                texts={texts}
+                now={now}
+              />
+            ))}
+            {renderAgyRows(agyTiers, texts, now)}
+          </>
+        )}
+      </div>
     </div>
   );
 }

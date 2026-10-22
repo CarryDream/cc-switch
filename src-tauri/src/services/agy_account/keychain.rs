@@ -77,7 +77,7 @@ impl SystemKeychain {
 }
 
 pub fn supported() -> bool {
-    cfg!(target_os = "macos")
+    cfg!(any(target_os = "macos", target_os = "windows"))
 }
 
 #[cfg(target_os = "macos")]
@@ -183,13 +183,96 @@ mod macos {
     }
 }
 
+#[cfg(target_os = "windows")]
+mod windows {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
+    use windows_sys::Win32::Security::Credentials::{
+        CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_ENTERPRISE, CRED_TYPE_GENERIC,
+    };
+
+    use crate::error::AppError;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(Some(0)).collect()
+    }
+
+    fn target_name(service: &str, account: &str) -> Vec<u16> {
+        to_wide(&format!("{service}:{account}"))
+    }
+
+    pub fn read(service: &str, account: &str) -> Result<Option<String>, AppError> {
+        let target = target_name(service, account);
+        let mut cred_ptr: *mut CREDENTIALW = std::ptr::null_mut();
+        unsafe {
+            if CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) == 0 {
+                let err = GetLastError();
+                if err == ERROR_NOT_FOUND {
+                    return Ok(None);
+                }
+                return Err(AppError::Config(format!(
+                    "读取 Windows 凭据管理器失败（错误码 {err}）"
+                )));
+            }
+            if cred_ptr.is_null() {
+                return Ok(None);
+            }
+            let cred = *cred_ptr;
+            let blob_slice = std::slice::from_raw_parts(
+                cred.CredentialBlob,
+                cred.CredentialBlobSize as usize,
+            );
+            // go-keyring 在 Windows 上以 UTF-8 字节存入凭据
+            let value = String::from_utf8(blob_slice.to_vec())
+                .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))?;
+            CredFree(cred_ptr as *const core::ffi::c_void);
+            let value = value.trim().to_string();
+            Ok((!value.is_empty()).then_some(value))
+        }
+    }
+
+    pub fn write(service: &str, account: &str, value: &str) -> Result<(), AppError> {
+        let mut target = target_name(service, account);
+        let mut user_name = to_wide(account);
+        let blob = value.as_bytes();
+        let cred = CREDENTIALW {
+            Flags: 0,
+            Type: CRED_TYPE_GENERIC,
+            TargetName: target.as_mut_ptr(),
+            Comment: std::ptr::null_mut(),
+            LastWritten: unsafe { std::mem::zeroed() },
+            CredentialBlobSize: blob.len() as u32,
+            CredentialBlob: blob.as_ptr() as *mut u8,
+            Persist: CRED_PERSIST_ENTERPRISE,
+            AttributeCount: 0,
+            Attributes: std::ptr::null_mut(),
+            TargetAlias: std::ptr::null_mut(),
+            UserName: user_name.as_mut_ptr(),
+        };
+        unsafe {
+            if CredWriteW(&cred, 0) == 0 {
+                let err = GetLastError();
+                return Err(AppError::Config(format!(
+                    "写入 Windows 凭据管理器失败（错误码 {err}）"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl AgyLoginStore for SystemKeychain {
     fn read(&self) -> Result<Option<String>, AppError> {
         #[cfg(target_os = "macos")]
         {
             macos::read(self.service, self.account)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            windows::read(self.service, self.account)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             Err(unsupported_error())
         }
@@ -200,7 +283,11 @@ impl AgyLoginStore for SystemKeychain {
         {
             macos::write(self.service, self.account, value)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            windows::write(self.service, self.account, value)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             let _ = value;
             Err(unsupported_error())
@@ -211,8 +298,8 @@ impl AgyLoginStore for SystemKeychain {
 pub fn unsupported_error() -> AppError {
     AppError::localized(
         "agy.account.unsupported_platform",
-        "切换 Antigravity 账号目前只支持 macOS",
-        "Switching Antigravity accounts is only supported on macOS for now",
+        "切换 Antigravity 账号目前只支持 macOS 和 Windows",
+        "Switching Antigravity accounts is only supported on macOS and Windows for now",
     )
 }
 

@@ -40,7 +40,7 @@ pub(crate) async fn agy_quota(
         Some(account_id) => manager.quota(account_id).await,
         None => match manager.live_quota().await {
             Some(result) => result,
-            None => return crate::services::subscription_agy::get_agy_subscription_quota().await,
+            None => return Ok(SubscriptionQuota::not_found(TOOL)),
         },
     };
     Ok(match result {
