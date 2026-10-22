@@ -332,7 +332,9 @@ function collectQuotaTargets(apps: PanelApp[]): QuotaTarget[] {
       seenKeys.add(key);
       targets.push({
         key,
-        name: app.name,
+        // 行名用在用供应商的名字（如自定义的「智谱」），比应用名（Claude Code）
+        // 更能说明这条额度是谁的；没有在用供应商时才退回应用名
+        name: app.current ?? app.name,
         quota: app.quota,
         attention: Boolean(app.attention),
       });
