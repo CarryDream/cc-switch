@@ -470,7 +470,20 @@ export function QuotaWidget() {
   const [state, setState] = useState<TrayPanelState | null>(null);
   const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const lastDownAt = useRef(0);
+
+  useEffect(() => {
+    const onFocus = () => setIsFocused(true);
+    const onBlur = () => setIsFocused(false);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   // 双击打开主窗口：mousedown 先于拖动生效，两次点按间隔够近就当双击
   const onCardMouseDown = (event: MouseEvent<HTMLDivElement>) => {
@@ -602,6 +615,9 @@ export function QuotaWidget() {
       ref={rootRef}
       className="qw-card"
       data-tauri-drag-region
+      data-active={isHovered || isFocused}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onMouseDown={onCardMouseDown}
     >
       {!state || !texts ? (
