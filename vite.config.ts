@@ -21,6 +21,7 @@ export default defineConfig(({ command }) => ({
       input: {
         main: path.resolve(__dirname, "src/index.html"),
         "tray-panel": path.resolve(__dirname, "src/tray-panel.html"),
+        "quota-widget": path.resolve(__dirname, "src/quota-widget.html"),
       },
     },
   },

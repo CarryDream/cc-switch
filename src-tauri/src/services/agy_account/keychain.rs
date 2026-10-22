@@ -70,14 +70,25 @@ impl SystemKeychain {
     }
 
     /// 真机测试用的另一条，别动 agy 那条。
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "macos"))]
     pub fn named(service: &'static str, account: &'static str) -> Self {
         Self { service, account }
     }
 }
 
+/// Whether the platform can switch the active agy login.
 pub fn supported() -> bool {
     cfg!(target_os = "macos")
+}
+
+/// Whether the platform can read agy's active login for quota queries.
+pub fn quota_read_supported() -> bool {
+    cfg!(any(target_os = "macos", target_os = "windows"))
+}
+
+fn decode_credential_blob(blob: &[u8]) -> Result<String, AppError> {
+    String::from_utf8(blob.to_vec())
+        .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))
 }
 
 #[cfg(target_os = "macos")]
@@ -183,13 +194,88 @@ mod macos {
     }
 }
 
+#[cfg(target_os = "windows")]
+mod windows {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
+    use windows_sys::Win32::Security::Credentials::{
+        CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
+    };
+
+    use crate::error::AppError;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(Some(0)).collect()
+    }
+
+    fn target_name(service: &str, account: &str) -> Vec<u16> {
+        to_wide(&format!("{service}:{account}"))
+    }
+
+    const MAX_CREDENTIAL_BLOB_SIZE: usize = 5 * 512;
+
+    struct CredentialGuard(*mut CREDENTIALW);
+
+    impl Drop for CredentialGuard {
+        fn drop(&mut self) {
+            unsafe { CredFree(self.0.cast()) };
+        }
+    }
+
+    pub fn read(service: &str, account: &str) -> Result<Option<String>, AppError> {
+        let target = target_name(service, account);
+        let mut cred_ptr: *mut CREDENTIALW = std::ptr::null_mut();
+        unsafe {
+            if CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) == 0 {
+                let err = GetLastError();
+                if err == ERROR_NOT_FOUND {
+                    return Ok(None);
+                }
+                return Err(AppError::Config(format!(
+                    "读取 Windows 凭据管理器失败（错误码 {err}）"
+                )));
+            }
+        }
+        if cred_ptr.is_null() {
+            return Err(AppError::Config("Windows 凭据管理器返回了空凭据".into()));
+        }
+        let _credential = CredentialGuard(cred_ptr);
+        let cred = unsafe { &*cred_ptr };
+        let blob_size = cred.CredentialBlobSize as usize;
+        if blob_size > MAX_CREDENTIAL_BLOB_SIZE {
+            return Err(AppError::Config(
+                "Windows 凭据管理器返回了超出限制的 Antigravity 登录数据".into(),
+            ));
+        }
+        if blob_size > 0 && cred.CredentialBlob.is_null() {
+            return Err(AppError::Config(
+                "Windows 凭据管理器返回了无效的 Antigravity 登录数据".into(),
+            ));
+        }
+        let blob = if blob_size == 0 {
+            Vec::new()
+        } else {
+            unsafe { std::slice::from_raw_parts(cred.CredentialBlob, blob_size) }.to_vec()
+        };
+        drop(_credential);
+        // go-keyring 在 Windows 上以 UTF-8 字节存入凭据；转换前先释放系统分配的结构。
+        // 空 blob 仍作为已存在的空值返回，由上层识别为无效登录，而不是误报为未登录。
+        super::decode_credential_blob(&blob).map(Some)
+    }
+}
+
 impl AgyLoginStore for SystemKeychain {
     fn read(&self) -> Result<Option<String>, AppError> {
         #[cfg(target_os = "macos")]
         {
             macos::read(self.service, self.account)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            windows::read(self.service, self.account)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             Err(unsupported_error())
         }
@@ -200,7 +286,12 @@ impl AgyLoginStore for SystemKeychain {
         {
             macos::write(self.service, self.account, value)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            let _ = value;
+            Err(unsupported_error())
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             let _ = value;
             Err(unsupported_error())
@@ -235,5 +326,24 @@ mod tests {
         assert!(decode("go-keyring-base64:!!!").is_err());
         assert!(decode("[1,2]").is_err());
         assert!(decode("not json").is_err());
+    }
+
+    #[test]
+    fn decodes_windows_credential_blobs_without_accepting_invalid_or_empty_values() {
+        assert_eq!(
+            decode_credential_blob(br#"{"token":{}}"#).unwrap(),
+            r#"{"token":{}}"#
+        );
+        assert!(decode_credential_blob(&[]).unwrap().is_empty());
+        assert!(decode_credential_blob(&[0xff]).is_err());
+    }
+
+    #[test]
+    fn separates_switching_support_from_quota_read_support() {
+        assert_eq!(supported(), cfg!(target_os = "macos"));
+        assert_eq!(
+            quota_read_supported(),
+            cfg!(any(target_os = "macos", target_os = "windows"))
+        );
     }
 }

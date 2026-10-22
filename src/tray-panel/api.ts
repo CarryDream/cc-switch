@@ -15,6 +15,8 @@ export interface PanelTexts {
   openPanel: string;
   configTab: string;
   usageTab: string;
+  /** 托盘面板底部开关额度悬浮窗 */
+  quotaWidget: string;
   /** 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长 */
   resetsIn: string;
   /** 时长单位：`{n}` 是数字；最多取两级，中间用 `durationSep` 隔开 */
@@ -40,6 +42,8 @@ export interface PanelQuotaLine {
   resetsAt: string | null;
   /** `text` 里要上绿色的那段数值（还有余额时的金额） */
   emphasis: string | null;
+  /** 机器可读的档位（`five_hour` / `weekly`）；没有档名的为空。悬浮窗挑主行用 */
+  tier: string | null;
 }
 
 export interface PanelQuota {
@@ -86,6 +90,7 @@ export interface TrayPanelState {
   feedback: string | null;
   apps: PanelApp[];
   lightweight: boolean;
+  quotaWidget: boolean;
   quitHint: string | null;
 }
 

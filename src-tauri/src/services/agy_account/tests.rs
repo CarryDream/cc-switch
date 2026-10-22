@@ -22,6 +22,17 @@ impl AgyLoginStore for MemoryLogin {
     }
 }
 
+struct ReadErrorLogin;
+
+impl AgyLoginStore for ReadErrorLogin {
+    fn read(&self) -> Result<Option<String>, AppError> {
+        Err(AppError::Config("mock credential read failure".into()))
+    }
+    fn write(&self, _value: &str) -> Result<(), AppError> {
+        unreachable!("quota-only mock must never write credentials")
+    }
+}
+
 fn id_token(sub: &str, email: &str) -> String {
     format!(
         "e30.{}.sig",
@@ -202,7 +213,7 @@ mod switching {
     async fn following_cards_query_the_account_agy_is_signed_in_with() {
         let (_dir, login, manager) = manager();
         assert_eq!(
-            manager.live_account_id().await,
+            manager.live_account_id().await.unwrap(),
             None,
             "agy 没登录时改问 agy"
         );
@@ -210,12 +221,15 @@ mod switching {
         add(&manager, "alice").await;
         set_live(&login, &credential("bob", "b1"));
         // 还没收录的号也收进来，之后直接查
-        assert_eq!(manager.live_account_id().await.as_deref(), Some("bob"));
+        assert_eq!(
+            manager.live_account_id().await.unwrap().as_deref(),
+            Some("bob")
+        );
         assert_eq!(manager.list().await.len(), 2);
 
         // 在 CC Switch 里删掉的号不再收回来，改问 agy
         manager.remove("bob").await.unwrap();
-        assert_eq!(manager.live_account_id().await, None);
+        assert_eq!(manager.live_account_id().await.unwrap(), None);
         assert_eq!(*login.writes.lock().unwrap(), 0);
     }
 
@@ -241,6 +255,32 @@ mod switching {
             ])
             .output();
     }
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn live_quota_distinguishes_missing_invalid_and_unreadable_credentials() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = AgyAccountManager::with_login_store(
+        dir.path().to_path_buf(),
+        Arc::new(MemoryLogin::default()),
+    );
+    assert!(missing.live_quota().await.unwrap().is_none());
+
+    let invalid_login = Arc::new(MemoryLogin::default());
+    *invalid_login.value.lock().unwrap() = Some("not JSON".into());
+    let invalid = AgyAccountManager::with_login_store(dir.path().to_path_buf(), invalid_login);
+    assert!(matches!(
+        invalid.live_quota().await,
+        Err(AccountQuotaError::Failed(message)) if message.contains("invalid or unrecognized")
+    ));
+
+    let unreadable =
+        AgyAccountManager::with_login_store(dir.path().to_path_buf(), Arc::new(ReadErrorLogin));
+    assert!(matches!(
+        unreadable.live_quota().await,
+        Err(AccountQuotaError::Failed(message)) if message.contains("mock credential read failure")
+    ));
 }
 
 #[tokio::test]

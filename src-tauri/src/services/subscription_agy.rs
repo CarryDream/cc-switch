@@ -120,6 +120,8 @@ pub(crate) async fn get_agy_subscription_quota() -> Result<SubscriptionQuota, St
         return Ok(SubscriptionQuota::not_found(TOOL));
     };
     let mut command = tokio::process::Command::new(bin);
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     command
         .args(["--print", "/usage", "--output-format", "json"])
         // 只问官方登录：GUI 进程里残留的 Key 会让 agy 改走 Key 模式。

@@ -45,6 +45,7 @@ mod session_manager;
 mod settings;
 mod store;
 
+mod quota_widget;
 mod tray;
 mod tray_panel;
 mod usage_events;
@@ -514,7 +515,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(window_state_flags())
-                .with_denylist(&[tray_panel::PANEL_LABEL])
+                .with_denylist(&[tray_panel::PANEL_LABEL, quota_widget::WIDGET_LABEL])
                 .build(),
         )
         .setup(|app| {
@@ -1502,6 +1503,10 @@ pub fn run() {
                 }
             }
 
+            // 若用户记住了开启用量悬浮窗，启动时自动拉起
+            if crate::quota_widget::is_enabled() {
+                crate::quota_widget::show_widget(app.handle());
+            }
 
             Ok(())
         })
@@ -1724,6 +1729,13 @@ pub fn run() {
             tray_panel::tray_panel_layout,
             tray_panel::tray_panel_hide,
             tray_panel::tray_panel_action,
+            quota_widget::quota_widget_ready,
+            quota_widget::quota_widget_appearance,
+            quota_widget::quota_widget_layout,
+            quota_widget::quota_widget_refresh,
+            quota_widget::quota_widget_hide,
+            quota_widget::quota_widget_show_main,
+            quota_widget::quota_widget_agy_quota,
             tray::tray_app_page_seen,
             commands::exit_proxy_apps_in_mode,
             commands::get_direct_provider,

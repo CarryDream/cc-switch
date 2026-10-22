@@ -86,6 +86,11 @@ pub struct PanelTexts {
     pub open_panel: &'static str,
     pub config_tab: &'static str,
     pub usage_tab: &'static str,
+    /// 托盘面板底部开关额度悬浮窗的一项。
+    pub quota_widget: &'static str,
+    /// 档位名（悬浮窗的 Antigravity 行用；翻译同托盘菜单 `TrayTexts`）。
+    pub tier_five_hour: &'static str,
+    pub tier_weekly: &'static str,
     /// 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长
     pub resets_in: &'static str,
     /// 时长单位：`{n}` 是数字；最多取两级（天+小时、小时+分），中间用 `duration_sep` 隔开
@@ -116,6 +121,21 @@ impl PanelTexts {
                 open_panel: "Open quick panel",
                 config_tab: "Configuration",
                 usage_tab: "Usage",
+                quota_widget: if language == "tr" {
+                    "Kullanım widget'ı"
+                } else {
+                    "Usage widget"
+                },
+                tier_five_hour: if language == "tr" {
+                    "5 saatlik"
+                } else {
+                    "5-hour"
+                },
+                tier_weekly: if language == "tr" {
+                    "Haftalık"
+                } else {
+                    "Weekly"
+                },
                 resets_in: "Resets in {when}",
                 duration_days: "{n}d",
                 duration_hours: "{n}h",
@@ -135,6 +155,9 @@ impl PanelTexts {
                 open_panel: "クイックパネルを開く",
                 config_tab: "構成",
                 usage_tab: "使用量",
+                quota_widget: "使用量ウィジェット",
+                tier_five_hour: "5時間",
+                tier_weekly: "週間",
                 resets_in: "{when}後にリセット",
                 duration_days: "{n}日",
                 duration_hours: "{n}時間",
@@ -154,6 +177,9 @@ impl PanelTexts {
                 open_panel: "開啟快捷面板",
                 config_tab: "配置",
                 usage_tab: "用量",
+                quota_widget: "用量懸浮窗",
+                tier_five_hour: "5 小時",
+                tier_weekly: "每週",
                 resets_in: "{when}後重置",
                 duration_days: "{n}天",
                 duration_hours: "{n}小時",
@@ -173,6 +199,9 @@ impl PanelTexts {
                 open_panel: "打开快捷面板",
                 config_tab: "配置",
                 usage_tab: "用量",
+                quota_widget: "用量悬浮窗",
+                tier_five_hour: "5 小时",
+                tier_weekly: "每周",
                 resets_in: "{when}后重置",
                 duration_days: "{n}天",
                 duration_hours: "{n}小时",
@@ -1182,8 +1211,10 @@ pub fn tray_panel_hide(app: AppHandle) {
 /// `WebviewWindowBuilder::build()` 会死锁（WebView2 限制）。原生菜单的事件回调没有这个问题。
 #[tauri::command]
 pub async fn tray_panel_action(app: AppHandle, id: String) {
-    let stays_open =
-        id.starts_with("prov:") || id.starts_with("profile_") || id == "lightweight_mode";
+    let stays_open = id.starts_with("prov:")
+        || id.starts_with("profile_")
+        || id == "lightweight_mode"
+        || id == crate::quota_widget::WIDGET_TOGGLE_ID;
     if !stays_open {
         hide_panel(&app);
     }

@@ -1,0 +1,345 @@
+/* 一层 240px 卡片与原生材质同尺寸。只改变背景，不降低内容透明度。 */
+html,
+body.quota-widget,
+body.quota-widget #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+body.quota-widget {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.qw-card {
+  --qw-ink: #19212c;
+  --qw-muted: #465365;
+  --qw-normal: #0369a1;
+  --qw-normal-light: #38bdf8;
+  --qw-warning: #a75109;
+  --qw-warning-light: #fcd34d;
+  --qw-danger: #b91c1c;
+  --qw-danger-light: #fca5a5;
+  --qw-surface: rgba(246, 249, 253, 0.84);
+  --qw-idle: 0.84;
+  --qw-hover: 0.88;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: min(240px, 100vw);
+  min-height: 40px;
+  max-height: 380px;
+  padding: 9px 11px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border: 0;
+  border-radius: 12px;
+  color: var(--qw-ink);
+  background: rgba(246, 249, 253, var(--qw-idle));
+  /* 顶部高光 + 底部暗边，画出玻璃厚度；阴影只做内发光，不外扩画布。 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.08),
+    inset 0 0 18px rgba(255, 255, 255, 0.18);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+html.dark .qw-card {
+  --qw-ink: #f1f4f9;
+  --qw-muted: #c3ccd8;
+  --qw-normal: #38bdf8;
+  --qw-normal-light: #bae6fd;
+  --qw-warning: #fbbf24;
+  --qw-warning-light: #fef08a;
+  --qw-danger: #f87171;
+  --qw-danger-light: #fecaca;
+  --qw-surface: rgba(24, 29, 38, 0.86);
+  --qw-idle: 0.86;
+  --qw-hover: 0.89;
+  background: rgba(24, 29, 38, var(--qw-idle));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+    inset 0 0 22px rgba(148, 197, 255, 0.1);
+}
+
+/* 液态玻璃（激进版）：DWM/AppKit 只给透明，模糊由 backdrop-filter 全权负责。
+   浅色 = 冰玻璃，深色 = 烟玻璃；idle 几乎纯透，hover 才略实。
+   关键：backdrop-filter 模糊半径要大（24px），底色要极低，让桌面背景"流"进来。 */
+html[data-glass="acrylic"] .qw-card,
+html[data-glass="native"] .qw-card {
+  --qw-idle: 0.38;
+  --qw-hover: 0.48;
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.46) 0%,
+      rgba(191, 219, 254, 0.18) 38%,
+      rgba(255, 255, 255, 0.06) 100%
+    ),
+    rgba(226, 236, 248, var(--qw-idle));
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.12),
+    inset 0 0 28px rgba(255, 255, 255, 0.35);
+  /* 玻璃态下文字加一道柔光，让它从模糊背景里立起来 */
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.55),
+    0 1px 2px rgba(255, 255, 255, 0.3);
+}
+html.dark[data-glass="acrylic"] .qw-card,
+html.dark[data-glass="native"] .qw-card {
+  --qw-idle: 0.42;
+  --qw-hover: 0.52;
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(56, 89, 145, 0.22) 38%,
+      rgba(0, 0, 0, 0.26) 100%
+    ),
+    rgba(13, 19, 30, var(--qw-idle));
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 28px rgba(125, 178, 255, 0.18);
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Windows 的系统圆角和网页圆角一致，没有外围留白。 */
+html[data-platform="windows"] .qw-card {
+  border-radius: 8px;
+}
+
+.qw-card[data-active="true"] {
+  background: rgba(246, 249, 253, var(--qw-hover));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.1),
+    inset 0 0 26px rgba(255, 255, 255, 0.32);
+}
+html.dark .qw-card[data-active="true"] {
+  background: rgba(24, 29, 38, var(--qw-hover));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+    inset 0 0 28px rgba(148, 197, 255, 0.2);
+}
+
+/* 原生玻璃态下的 hover：在着色层上把 idle → hover 的差距拉开，
+   并加一道对角掠光，模拟液态玻璃被"点亮"的瞬间。 */
+html[data-glass="acrylic"] .qw-card[data-active="true"],
+html[data-glass="native"] .qw-card[data-active="true"] {
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.58) 0%,
+      rgba(191, 219, 254, 0.24) 38%,
+      rgba(255, 255, 255, 0.08) 100%
+    ),
+    rgba(226, 236, 248, var(--qw-hover));
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.14),
+    inset 0 0 36px rgba(255, 255, 255, 0.5);
+}
+html.dark[data-glass="acrylic"] .qw-card[data-active="true"],
+html.dark[data-glass="native"] .qw-card[data-active="true"] {
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(96, 145, 220, 0.28) 38%,
+      rgba(0, 0, 0, 0.24) 100%
+    ),
+    rgba(13, 19, 30, var(--qw-hover));
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 36px rgba(147, 197, 253, 0.28);
+}
+
+.qw-row {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+.qw-row-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 13px;
+}
+.qw-app-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.qw-reset {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1.2;
+  color: var(--qw-muted);
+  background: rgba(128, 140, 160, 0.1);
+}
+.qw-pct {
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: end;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.qw-warn {
+  color: var(--qw-warning);
+}
+.qw-danger {
+  color: var(--qw-danger);
+}
+
+/* 所有行相同的 4px 槽，周端点在填充之上，不会被满额的 5h 条覆盖。 */
+.qw-bar-track {
+  --qw-track-color: var(--qw-normal);
+  position: relative;
+  height: 4px;
+  min-height: 4px;
+  width: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--qw-track-color) 15%, transparent);
+  overflow: hidden;
+  isolation: isolate;
+}
+.qw-bar-track[data-status="warn"] {
+  --qw-track-color: var(--qw-warning);
+}
+.qw-bar-track[data-status="danger"] {
+  --qw-track-color: var(--qw-danger);
+  /* 即使 5h 还满着，也明确表示整行不可用，不能看起来是一根健康的满条。 */
+  box-shadow: inset 0 0 0 1px var(--qw-danger);
+}
+.qw-bar-fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform-origin: left center;
+  background: var(--qw-normal);
+  pointer-events: none;
+}
+.qw-bar-fill[data-status="warn"] {
+  background: var(--qw-warning);
+}
+.qw-bar-fill[data-status="danger"] {
+  background: var(--qw-danger);
+}
+.qw-bar-track[data-status="danger"] .qw-bar-fill[data-status="normal"] {
+  opacity: 0.3;
+}
+.qw-week-marker {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: clamp(0px, calc(var(--week-position) - 2px), calc(100% - 4px));
+  width: 4px;
+  border-radius: 1px;
+  background: var(--qw-normal-light);
+  box-shadow: 0 0 0 1px var(--qw-ink);
+  pointer-events: none;
+}
+.qw-week-marker[data-status="warn"] {
+  background: var(--qw-warning-light);
+}
+.qw-week-marker[data-status="danger"] {
+  background: var(--qw-danger);
+}
+
+.qw-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  font-size: 8px;
+  line-height: 1.2;
+  color: var(--qw-muted);
+}
+.qw-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.qw-key-fill {
+  width: 9px;
+  height: 3px;
+  background: var(--qw-normal);
+}
+.qw-key-marker {
+  width: 3px;
+  height: 5px;
+  background: var(--qw-normal-light);
+  box-shadow: 0 0 0 0.5px var(--qw-muted);
+}
+.qw-attention {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--qw-warning);
+}
+.qw-note,
+.qw-empty {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--qw-muted);
+}
+.qw-skel {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.18);
+}
+
+@media (forced-colors: active) {
+  .qw-card {
+    color: CanvasText;
+    background: Canvas;
+  }
+  .qw-bar-fill {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+  .qw-week-marker {
+    background: Canvas;
+    box-shadow: 0 0 0 1px CanvasText;
+    forced-color-adjust: none;
+  }
+}

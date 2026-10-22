@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-mod agy_account;
+pub(crate) mod agy_account;
 mod auth;
 mod balance;
 mod codex_oauth;

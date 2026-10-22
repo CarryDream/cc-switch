@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quota-widget",
+  "description": "额度悬浮窗：读数据、刷新额度、回报布局，用不到主窗口的其它权限",
+  "windows": ["quota-widget"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

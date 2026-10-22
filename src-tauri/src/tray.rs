@@ -85,6 +85,8 @@ pub struct TrayTexts {
     pub show_main: &'static str,
     pub open_website: &'static str,
     pub lightweight_mode: &'static str,
+    /// 托盘菜单里开关额度悬浮窗的一项。
+    pub quota_widget: &'static str,
     pub quit: &'static str,
     /// 有应用在用路由服务时的「退出」：写明后果（客户端指回直连、路由服务停止，下次打开自动接回）。
     pub quit_stops_routing: &'static str,
@@ -190,6 +192,7 @@ impl TrayTexts {
                 show_main: "Open CC Switch",
                 open_website: "Open official website",
                 lightweight_mode: "Lightweight mode",
+                quota_widget: "Usage widget",
                 quit: "Quit CC Switch",
                 quit_stops_routing: "Quit CC Switch (stops the routing service)",
                 projects_label: "Projects",
@@ -250,6 +253,7 @@ impl TrayTexts {
                 texts.show_main = "CC Switch'i aç";
                 texts.open_website = "Resmî web sitesini aç";
                 texts.lightweight_mode = "Hafif mod";
+                texts.quota_widget = "Kullanım widget'ı";
                 texts.quit = "CC Switch'ten çık";
                 texts.quit_stops_routing = "CC Switch'ten çık (yönlendirme hizmeti durur)";
                 texts.projects_label = "Projeler";
@@ -305,6 +309,7 @@ impl TrayTexts {
                 show_main: "CC Switch を開く",
                 open_website: "公式サイトを開く",
                 lightweight_mode: "軽量モード",
+                quota_widget: "使用量ウィジェット",
                 quit: "CC Switch を終了",
                 quit_stops_routing: "CC Switch を終了（ルーティングサービスが停止します）",
                 projects_label: "プロジェクト",
@@ -362,6 +367,7 @@ impl TrayTexts {
                 show_main: "開啟 CC Switch",
                 open_website: "開啟官方網站",
                 lightweight_mode: "輕量模式",
+                quota_widget: "用量懸浮窗",
                 quit: "退出 CC Switch",
                 quit_stops_routing: "退出 CC Switch（路由服務會停止）",
                 projects_label: "專案",
@@ -417,6 +423,7 @@ impl TrayTexts {
                 show_main: "打开 CC Switch",
                 open_website: "打开官方网站",
                 lightweight_mode: "轻量模式",
+                quota_widget: "用量悬浮窗",
                 quit: "退出 CC Switch",
                 quit_stops_routing: "退出 CC Switch（路由服务会停止）",
                 projects_label: "项目",
@@ -1941,6 +1948,12 @@ fn build_menu_model(
     }
 
     menu.push(TrayEntry::check(
+        crate::quota_widget::WIDGET_TOGGLE_ID,
+        texts.quota_widget,
+        true,
+        crate::quota_widget::is_enabled(),
+    ));
+    menu.push(TrayEntry::check(
         "lightweight_mode",
         texts.lightweight_mode,
         true,
@@ -2045,6 +2058,7 @@ pub struct PanelModel {
     pub feedback: Option<String>,
     pub apps: Vec<PanelApp>,
     pub lightweight: bool,
+    pub quota_widget: bool,
     /// 有应用在用路由服务时「退出」的后果，写在退出按钮的提示里。
     pub quit_hint: Option<String>,
 }
@@ -2099,6 +2113,9 @@ pub struct PanelQuotaLine {
     pub resets_at: Option<String>,
     /// `text` 里要上绿色的那段数值（还有余额时的金额）；其余为空。
     pub emphasis: Option<String>,
+    /// 机器可读的档位（`five_hour` / `weekly`）；余额、失败这类没有档名的为空。
+    /// 悬浮窗靠它挑主行：平时只画 5 小时那档，其余档悬停再看。
+    pub tier: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2123,6 +2140,16 @@ pub struct PanelProvider {
     pub quota: Option<PanelQuota>,
 }
 
+/// 从档名反查机器可读的档位（`tier_label` 的逆映射，同一份 `TrayTexts` 不会错位）。
+/// 只标悬浮窗要用的两档，其余档为空。
+fn tier_id(texts: &TrayTexts, label: Option<&'static str>) -> Option<&'static str> {
+    match label {
+        Some(label) if label == texts.tier_five_hour => Some("five_hour"),
+        Some(label) if label == texts.tier_weekly => Some("weekly"),
+        _ => None,
+    }
+}
+
 fn panel_quota(
     texts: &TrayTexts,
     view: &QuotaView,
@@ -2139,6 +2166,7 @@ fn panel_quota(
                     warn: line.left < WARN_BELOW_PERCENT,
                     resets_at: line.resets_at.clone(),
                     emphasis: line.emphasis.clone(),
+                    tier: tier_id(texts, line.label),
                 })
                 .collect(),
             note: None,
@@ -2326,6 +2354,7 @@ pub(crate) fn collect_panel_model(app_state: &AppState) -> Result<PanelModel, Ap
             .map(|feedback| feedback_text(&texts, feedback)),
         apps,
         lightweight: crate::lightweight::is_lightweight_mode(),
+        quota_widget: crate::quota_widget::is_enabled(),
         quit_hint: status
             .routing_in_use
             .then(|| texts.quit_stops_routing.to_string()),
@@ -3055,6 +3084,7 @@ pub fn handle_tray_menu_event(app: &tauri::AppHandle, event_id: &str) {
             app.exit(0);
         }
         crate::tray_panel::OPEN_PANEL_ID => crate::tray_panel::show_at_cursor(app),
+        crate::quota_widget::WIDGET_TOGGLE_ID => crate::quota_widget::toggle(app),
         _ => {
             if let Some(navigation) = parse_nav_id(event_id) {
                 navigate(app, navigation);
@@ -4150,6 +4180,7 @@ mod tests {
                 "Claude Code · Kimi For Coding",
                 "Grok Build · 添加供应商…",
                 "---",
+                "用量悬浮窗",
                 "轻量模式",
                 "---",
                 "打开官方网站",
@@ -4157,7 +4188,7 @@ mod tests {
             ]
         );
         assert!(matches!(&menu[3], TrayEntry::Item { id, .. } if id == "nav:add:grokbuild"));
-        assert!(matches!(&menu[8], TrayEntry::Item { id, .. } if id == "quit"));
+        assert!(matches!(&menu[9], TrayEntry::Item { id, .. } if id == "quit"));
     }
 
     #[test]
@@ -4480,6 +4511,14 @@ mod tests {
         assert!(menu.iter().any(|entry| matches!(entry,
             TrayEntry::Check { id, checked: true, text, .. }
                 if id == "lightweight_mode" && text == "Lightweight mode")));
+    }
+
+    #[test]
+    fn quota_widget_is_a_check_item() {
+        let menu = build_menu_model(&en(), &MenuStatus::default(), &[], false, now());
+        assert!(menu.iter().any(|entry| matches!(entry,
+            TrayEntry::Check { id, text, .. }
+                if id == crate::quota_widget::WIDGET_TOGGLE_ID && text == "Usage widget")));
     }
 
     #[test]

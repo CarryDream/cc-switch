@@ -43,6 +43,7 @@ const state: TrayPanelState = {
     openPanel: "Open panel",
     configTab: "Configuration",
     usageTab: "Usage",
+    quotaWidget: "Usage widget",
     resetsIn: "Resets in {when}",
     durationDays: "{n}d",
     durationHours: "{n}h",
@@ -77,6 +78,7 @@ const state: TrayPanelState = {
     },
   ],
   lightweight: false,
+  quotaWidget: false,
   quitHint: null,
 };
 
@@ -177,6 +179,7 @@ describe("TrayPanel window layout", () => {
                 warn: false,
                 resetsAt: null,
                 emphasis: "82.10 CNY",
+                tier: null,
               },
               {
                 text: "Balance used up",
@@ -184,6 +187,7 @@ describe("TrayPanel window layout", () => {
                 warn: true,
                 resetsAt: null,
                 emphasis: null,
+                tier: null,
               },
             ],
             note: null,
