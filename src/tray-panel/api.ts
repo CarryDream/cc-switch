@@ -90,6 +90,7 @@ export interface TrayPanelState {
   feedback: string | null;
   apps: PanelApp[];
   lightweight: boolean;
+  quotaWidget: boolean;
   quitHint: string | null;
 }
 

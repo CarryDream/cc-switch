@@ -63,10 +63,10 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 
     let handle = window.clone();
     window.on_window_event(move |event| {
-        // 常驻悬浮窗：失焦不收起，只有点 ✕ / 托盘菜单才隐藏。
+        // 常驻悬浮窗：失焦不收起，只有关闭请求时才隐藏并同步状态。
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
-            hide_window(&handle);
+            set_enabled(handle.app_handle(), false);
         }
     });
     Ok(window)
@@ -91,27 +91,46 @@ fn hide_window(window: &WebviewWindow) {
     release_if_lightweight(window.app_handle());
 }
 
+pub fn is_enabled() -> bool {
+    crate::settings::get_settings().enable_quota_widget
+}
+
+pub fn show_widget(app: &AppHandle) {
+    if let Some(window) = widget_window(app) {
+        if PENDING_REVEAL.load(Ordering::Acquire) {
+            return;
+        }
+        let _ = window.show();
+        return;
+    }
+    let _ = ensure_window(app);
+}
+
+pub fn set_enabled(app: &AppHandle, enabled: bool) {
+    let mut settings = crate::settings::get_settings();
+    if settings.enable_quota_widget != enabled {
+        settings.enable_quota_widget = enabled;
+        if let Err(e) = crate::settings::update_settings(settings) {
+            log::warn!("[QuotaWidget] 更新悬浮窗设置失败: {e}");
+        }
+    }
+    if enabled {
+        show_widget(app);
+    } else {
+        hide_widget(app);
+    }
+    crate::tray::refresh_tray_menu(app);
+}
+
 pub fn hide_widget(app: &AppHandle) {
     if let Some(window) = widget_window(app) {
         hide_window(&window);
     }
 }
 
-/// 托盘菜单开关：开着就关，关着就开。窗口销毁过（轻量模式）就重建，前端加载后经
-/// `quota_widget_ready` 摆好位置再显示。
+/// 托盘开关：同步设置状态并记忆，关闭时隐藏、开启时显示或创建。
 pub fn toggle(app: &AppHandle) {
-    if let Some(window) = widget_window(app) {
-        if PENDING_REVEAL.load(Ordering::Acquire) {
-            return; // 刚建好还在等前端排版，ready 会显示它
-        }
-        if window.is_visible().unwrap_or(false) {
-            hide_window(&window);
-        } else {
-            let _ = window.show();
-        }
-        return;
-    }
-    let _ = ensure_window(app);
+    set_enabled(app, !is_enabled());
 }
 
 /// 轻量模式要释放全部 WebView：悬浮窗隐藏（或此刻被收起）时销毁，下次打开重建。
@@ -251,7 +270,7 @@ pub async fn quota_widget_refresh(app: AppHandle) {
 
 #[tauri::command]
 pub fn quota_widget_hide(app: AppHandle) {
-    hide_widget(&app);
+    set_enabled(&app, false);
 }
 
 /// 双击悬浮窗打开主窗口（和左键点托盘图标同一条路径）。

@@ -1501,6 +1501,10 @@ pub fn run() {
                 }
             }
 
+            // 若用户记住了开启用量悬浮窗，启动时自动拉起
+            if crate::quota_widget::is_enabled() {
+                crate::quota_widget::show_widget(app.handle());
+            }
 
             Ok(())
         })

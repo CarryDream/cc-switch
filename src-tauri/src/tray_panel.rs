@@ -1211,8 +1211,10 @@ pub fn tray_panel_hide(app: AppHandle) {
 /// `WebviewWindowBuilder::build()` 会死锁（WebView2 限制）。原生菜单的事件回调没有这个问题。
 #[tauri::command]
 pub async fn tray_panel_action(app: AppHandle, id: String) {
-    let stays_open =
-        id.starts_with("prov:") || id.starts_with("profile_") || id == "lightweight_mode";
+    let stays_open = id.starts_with("prov:")
+        || id.starts_with("profile_")
+        || id == "lightweight_mode"
+        || id == crate::quota_widget::WIDGET_TOGGLE_ID;
     if !stays_open {
         hide_panel(&app);
     }

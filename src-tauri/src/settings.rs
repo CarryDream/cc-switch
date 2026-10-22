@@ -457,6 +457,9 @@ pub struct AppSettings {
     /// 默认关：用托盘面板，想要原生菜单在设置里换回。
     #[serde(default)]
     pub native_tray_menu: bool,
+    /// 桌面用量悬浮窗开关（默认关闭）
+    #[serde(default)]
+    pub enable_quota_widget: bool,
     /// Keep Codex ChatGPT login material in auth.json when switching to third-party providers.
     /// Opt-in: defaults to false so third-party switches cleanly overwrite auth.json.
     #[serde(default)]
@@ -646,6 +649,7 @@ impl Default for AppSettings {
             show_provider_search: true,
             check_tool_updates_on_startup: false,
             native_tray_menu: false,
+            enable_quota_widget: false,
             preserve_codex_official_auth_on_switch: false,
             unify_codex_session_history: false,
             unify_codex_migrate_existing: None,
@@ -1634,6 +1638,15 @@ mod tests {
         assert!(!missing.native_tray_menu);
         let menu: AppSettings = serde_json::from_str(r#"{"nativeTrayMenu":true}"#).unwrap();
         assert!(menu.native_tray_menu);
+    }
+
+    #[test]
+    fn enable_quota_widget_defaults_off_and_keeps_a_saved_choice() {
+        assert!(!AppSettings::default().enable_quota_widget);
+        let missing: AppSettings = serde_json::from_str("{}").unwrap();
+        assert!(!missing.enable_quota_widget);
+        let widget: AppSettings = serde_json::from_str(r#"{"enableQuotaWidget":true}"#).unwrap();
+        assert!(widget.enable_quota_widget);
     }
 
     #[test]

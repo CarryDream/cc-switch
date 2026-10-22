@@ -1946,9 +1946,11 @@ fn build_menu_model(
         menu.push(TrayEntry::Separator);
     }
 
-    menu.push(TrayEntry::item(
+    menu.push(TrayEntry::check(
         crate::quota_widget::WIDGET_TOGGLE_ID,
         texts.quota_widget,
+        true,
+        crate::quota_widget::is_enabled(),
     ));
     menu.push(TrayEntry::check(
         "lightweight_mode",
@@ -2055,6 +2057,7 @@ pub struct PanelModel {
     pub feedback: Option<String>,
     pub apps: Vec<PanelApp>,
     pub lightweight: bool,
+    pub quota_widget: bool,
     /// 有应用在用路由服务时「退出」的后果，写在退出按钮的提示里。
     pub quit_hint: Option<String>,
 }
@@ -2350,6 +2353,7 @@ pub(crate) fn collect_panel_model(app_state: &AppState) -> Result<PanelModel, Ap
             .map(|feedback| feedback_text(&texts, feedback)),
         apps,
         lightweight: crate::lightweight::is_lightweight_mode(),
+        quota_widget: crate::quota_widget::is_enabled(),
         quit_hint: status
             .routing_in_use
             .then(|| texts.quit_stops_routing.to_string()),
@@ -4506,6 +4510,14 @@ mod tests {
         assert!(menu.iter().any(|entry| matches!(entry,
             TrayEntry::Check { id, checked: true, text, .. }
                 if id == "lightweight_mode" && text == "Lightweight mode")));
+    }
+
+    #[test]
+    fn quota_widget_is_a_check_item() {
+        let menu = build_menu_model(&en(), &MenuStatus::default(), &[], false, now());
+        assert!(menu.iter().any(|entry| matches!(entry,
+            TrayEntry::Check { id, text, .. }
+                if id == crate::quota_widget::WIDGET_TOGGLE_ID && text == "Usage widget")));
     }
 
     #[test]

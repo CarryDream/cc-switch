@@ -1086,6 +1086,37 @@ export function TrayPanel() {
           <button
             type="button"
             role="switch"
+            aria-checked={state.quotaWidget}
+            onClick={() => action("widget:toggle")}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px]",
+              FOCUS_RING,
+              ROW_HOVER,
+            )}
+          >
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
+              <Gauge className="h-4 w-4" />
+            </span>
+            <span className="flex-1">{texts.quotaWidget}</span>
+            <span
+              className={cn(
+                "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
+                state.quotaWidget
+                  ? "bg-blue-500"
+                  : "bg-black/15 dark:bg-white/20",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-[left]",
+                  state.quotaWidget ? "left-[16px]" : "left-[2px]",
+                )}
+              />
+            </span>
+          </button>
+          <button
+            type="button"
+            role="switch"
             aria-checked={state.lightweight}
             onClick={() => action("lightweight_mode")}
             className={cn(
@@ -1115,12 +1146,6 @@ export function TrayPanel() {
             </span>
           </button>
           <div className="flex">
-            <FooterButton
-              className="flex-1"
-              icon={<Gauge className="h-4 w-4" />}
-              text={texts.quotaWidget}
-              onClick={() => action("widget:toggle")}
-            />
             <FooterButton
               className="flex-1"
               icon={<ExternalLink className="h-4 w-4" />}

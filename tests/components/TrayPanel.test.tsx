@@ -78,6 +78,7 @@ const state: TrayPanelState = {
     },
   ],
   lightweight: false,
+  quotaWidget: false,
   quitHint: null,
 };
 
