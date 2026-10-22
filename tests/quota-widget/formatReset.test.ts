@@ -54,7 +54,14 @@ describe("formatResetIn", () => {
   });
 
   it("英语用空格分隔单位", () => {
-    const en = { ...texts, resetsIn: "Resets in {when}", durationDays: "{n}d", durationHours: "{n}h", durationMinutes: "{n}m", durationSep: " " };
+    const en = {
+      ...texts,
+      resetsIn: "Resets in {when}",
+      durationDays: "{n}d",
+      durationHours: "{n}h",
+      durationMinutes: "{n}m",
+      durationSep: " ",
+    };
     const now = Date.parse("2026-10-22T10:00:00Z");
     expect(formatResetIn("2026-10-22T12:34:00Z", now, en)).toBe(
       "Resets in 2h 34m",

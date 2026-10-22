@@ -2,11 +2,10 @@
 //! 用量和重置时间。数据与托盘面板同源（`tray::collect_panel_model`），刷新走托盘的
 //! 同一条防抖管线；窗口只做展示，不提供切换等写操作。
 //!
-//! - 窗口懒创建，关掉（✕ / 托盘菜单）只是隐藏；进入轻量模式时销毁，下次打开重建。
+//! - 托盘开关持久化；窗口与卡片同尺寸，无外围画布。关闭只隐藏，轻量模式下隐藏后释放。
 //! - 位置记在前端 localStorage（物理像素），打开时先摆好位置和尺寸再显示，避免闪跳。
-//! - 玻璃：macOS 26 用 `NSGlassEffectView`（Liquid Glass），更早的系统用 Popover 材质
-//!   毛玻璃；Windows 11 用 DWM 系统背景（Acrylic）+ DWM 圆角，设置失败回退网页自绘
-//!   磨砂；Linux 没有原生材质，网页自己画。
+//! - macOS 26 使用 NSGlassEffectView，旧 macOS 使用 Popover 材质；Windows 11 使用原生
+//!   Acrylic，关闭系统描边。原生材质不可用时用较实的半透明底色保读，不冒充桌面模糊。
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -49,7 +48,8 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
             .minimizable(false)
             .decorations(false)
             .transparent(true)
-            // 无边框透明窗口的系统阴影会暴露方形外框，Windows 关掉；macOS 留着给卡片投影。
+            .background_color(tauri::window::Color(0, 0, 0, 0))
+            // 与卡片同尺寸，不为阴影扩画布，避免系统材质出现第二层外框。
             .shadow(!cfg!(target_os = "windows"))
             .always_on_top(true)
             .skip_taskbar(true)
@@ -111,7 +111,9 @@ pub fn set_enabled(app: &AppHandle, enabled: bool) {
     if settings.enable_quota_widget != enabled {
         settings.enable_quota_widget = enabled;
         if let Err(e) = crate::settings::update_settings(settings) {
-            log::warn!("[QuotaWidget] 更新悬浮窗设置失败: {e}");
+            log::error!("[QuotaWidget] 设置未保存，保留原来的悬浮窗状态: {e}");
+            crate::tray::refresh_tray_menu(app);
+            return;
         }
     }
     if enabled {
@@ -192,7 +194,6 @@ fn clamp_within(x: i32, y: i32, bounds: (i32, i32, i32, i32)) -> Option<(i32, i3
 
 /// 摆一次窗口：位置（有就挪）、尺寸（按显示器缩放换物理像素）、玻璃跟着内容改大小。
 fn apply_frame(window: &WebviewWindow, position: Option<(i32, i32)>, width: f64, height: f64) {
-    let scale = window.scale_factor().unwrap_or(1.0);
     let width = width.clamp(MIN_WIDTH, MAX_WIDTH);
     let height = height.clamp(MIN_HEIGHT, MAX_HEIGHT);
     let changed = *lock(&APPLIED_SIZE) != Some((width, height));
@@ -201,10 +202,7 @@ fn apply_frame(window: &WebviewWindow, position: Option<(i32, i32)>, width: f64,
         if let Some((x, y)) = position {
             let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
         }
-        let _ = window.set_size(tauri::PhysicalSize::new(
-            (width * scale).round() as u32,
-            (height * scale).round() as u32,
-        ));
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
         platform::apply(window, width, height);
     } else if let Some((x, y)) = position {
         let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
@@ -251,6 +249,15 @@ pub fn quota_widget_ready(
         let _ = window.show();
     }
     info
+}
+
+/// 只更新这个窗口的材质外观，主窗口和用户主题设置不受影响。
+#[tauri::command]
+pub fn quota_widget_appearance(app: AppHandle, dark: bool) -> WidgetGlass {
+    if let Some(window) = widget_window(&app) {
+        platform::appearance(&window, dark);
+    }
+    WidgetGlass { glass: platform::glass(), platform: std::env::consts::OS }
 }
 
 /// 内容变了（数据到货、深浅色切换）：窗口跟着内容改尺寸。
@@ -345,7 +352,21 @@ mod platform {
         Retained::into_super(effect)
     }
 
-    pub fn init(_window: &WebviewWindow) {}
+    pub fn init(window: &WebviewWindow) {
+        let _ = window.run_on_main_thread(|| GLASS.with(|slot| *slot.borrow_mut() = None));
+    }
+
+    pub fn appearance(window: &WebviewWindow, dark: bool) {
+        let target = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            use objc2_app_kit_03::{NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua};
+            let Some(window) = ns_window(&target) else { return; };
+            // SAFETY: AppKit 提供的常量，进程存活期间一直有效。
+            let name = unsafe { if dark { NSAppearanceNameDarkAqua } else { NSAppearanceNameAqua } };
+            let appearance = NSAppearance::appearanceNamed(name);
+            window.setAppearance(appearance.as_deref());
+        });
+    }
 
     /// 窗口改了尺寸：玻璃跟着铺满内容区。
     pub fn apply(window: &WebviewWindow, _width: f64, _height: f64) {
@@ -386,13 +407,72 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use tauri::WebviewWindow;
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_TRANSIENTWINDOW,
+        DWMWA_BORDER_COLOR, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+    };
+    use windows_sys::Win32::UI::Controls::MARGINS;
+
+    static ACRYLIC: AtomicBool = AtomicBool::new(false);
 
     pub fn glass() -> &'static str {
-        "frosted"
+        if ACRYLIC.load(Ordering::Acquire) { "acrylic" } else { "frosted" }
     }
 
-    pub fn init(_window: &WebviewWindow) {}
+    pub fn init(window: &WebviewWindow) {
+        ACRYLIC.store(false, Ordering::Release);
+        let Ok(hwnd) = window.hwnd() else { return; };
+        let margins = MARGINS {
+            cxLeftWidth: -1,
+            cxRightWidth: -1,
+            cyTopHeight: -1,
+            cyBottomHeight: -1,
+        };
+        // SAFETY: HWND 来自存活的 Tauri 窗口；每个属性传入的值和长度匹配 Win32 定义。
+        unsafe {
+            // 只扩展 frame 进客户区（让背景真正透明），不设 DWMWA_SYSTEMBACKDROP_TYPE。
+            // Acrylic/Mica 是 DWM 自己涂一层不透明底色，会盖住网页的 backdrop-filter，
+            // 结果看起来不是玻璃而是一块磨砂板。液态玻璃要的是：DWM 给透明 + CSS 自己模糊。
+            let extended = DwmExtendFrameIntoClientArea(hwnd.0 as _, &margins) >= 0;
+            // DWMSBT_NONE = 1，等价于"不要系统材质"，让 CSS backdrop-filter 全权负责模糊。
+            let backdrop_none = 1_u32;
+            let result = DwmSetWindowAttribute(
+                hwnd.0 as _, DWMWA_SYSTEMBACKDROP_TYPE as u32,
+                &backdrop_none as *const _ as _, std::mem::size_of_val(&backdrop_none) as u32,
+            );
+            ACRYLIC.store(extended && result >= 0, Ordering::Release);
+            if !extended || result < 0 {
+                log::warn!("[QuotaWidget] 系统透明扩展不可用，回退半透明底色 ({result:#x})");
+            }
+            // DWMWA_COLOR_NONE：只保留系统圆角，不让 DWM 再描一圈外边框。
+            let border = 0xffff_fffe_u32;
+            let corners = DWMWCP_ROUND;
+            DwmSetWindowAttribute(
+                hwnd.0 as _, DWMWA_BORDER_COLOR as u32,
+                &border as *const _ as _, std::mem::size_of_val(&border) as u32,
+            );
+            DwmSetWindowAttribute(
+                hwnd.0 as _, DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+                &corners as *const _ as _, std::mem::size_of_val(&corners) as u32,
+            );
+        }
+    }
+
+    pub fn appearance(window: &WebviewWindow, dark: bool) {
+        let Ok(hwnd) = window.hwnd() else { return; };
+        let value = i32::from(dark);
+        // SAFETY: HWND 在调用期间存活；属性接收一个 BOOL（32 位整数）。
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd.0 as _, DWMWA_USE_IMMERSIVE_DARK_MODE as u32,
+                &value as *const _ as _, std::mem::size_of_val(&value) as u32,
+            );
+        }
+    }
 
     pub fn apply(_window: &WebviewWindow, _width: f64, _height: f64) {}
 }
@@ -401,11 +481,11 @@ mod platform {
 mod platform {
     use tauri::WebviewWindow;
 
-    pub fn glass() -> &'static str {
-        "frosted"
-    }
+    pub fn glass() -> &'static str { "frosted" }
 
     pub fn init(_window: &WebviewWindow) {}
+
+    pub fn appearance(_window: &WebviewWindow, _dark: bool) {}
 
     pub fn apply(_window: &WebviewWindow, _width: f64, _height: f64) {}
 }
@@ -413,6 +493,64 @@ mod platform {
 #[cfg(test)]
 mod tests {
     use super::clamp_within;
+
+    #[cfg(target_os = "windows")]
+    #[tauri::command]
+    fn quota_preview_report(body: String) {
+        println!("[quota-preview-body] {body}");
+    }
+
+    /// Opt-in renderer/material smoke test. Uses a different app identifier and synthetic data,
+    /// never calls the real application setup, account queries, or installed singleton.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires the renderer on port 3001 and an interactive Windows desktop"]
+    fn native_visual_smoke() {
+        use tauri::Manager;
+        let mut context = tauri::generate_context!();
+        context.config_mut().identifier = "com.ccswitch.quota-visual-check".into();
+        context.config_mut().app.windows.clear();
+        context.config_mut().build.dev_url = Some("http://127.0.0.1:3001".parse().unwrap());
+        tauri::Builder::default()
+            .any_thread()
+            .invoke_handler(tauri::generate_handler![
+                super::quota_widget_ready,
+                super::quota_widget_layout,
+                super::quota_widget_appearance,
+                quota_preview_report,
+            ])
+            .setup(|app| {
+                let background = concat!("http://127.0.0.1:3001/@fs/", env!("CARGO_MANIFEST_DIR"), "/../tests/fixtures/quotaWidgetBackdrop.html");
+                tauri::WebviewWindowBuilder::new(app, "quota-visual-background", tauri::WebviewUrl::External(background.parse()?))
+                    .title("Quota visual backdrop")
+                    .position(190.0, 190.0).inner_size(400.0, 260.0)
+                    .decorations(false).build()?;
+                let window = tauri::WebviewWindowBuilder::new(app, super::WIDGET_LABEL, tauri::WebviewUrl::App("quota-widget.html".into()))
+                    .title("CC Switch quota visual check")
+                    .inner_size(240.0, 140.0).position(220.0, 220.0)
+                    .transparent(true).background_color(tauri::window::Color(0, 0, 0, 0))
+                    .decorations(false).shadow(false).resizable(false)
+                    .visible(false).always_on_top(true)
+                    .initialization_script(include_str!("../../tests/fixtures/quotaWidgetPreview.js"))
+                    .build()?;
+                super::PENDING_REVEAL.store(true, std::sync::atomic::Ordering::Release);
+                *super::lock(&super::APPLIED_SIZE) = None;
+                super::platform::init(&window);
+                println!("[quota-preview-hwnd] {}", window.hwnd()?.0 as usize);
+                println!("[quota-preview-ready]");
+                window.eval("setTimeout(() => window.__TAURI_INTERNALS__.invoke('quota_preview_report', {body: document.body.innerText}), 5000)")?;
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(18)).await;
+                    if let Some(window) = handle.get_webview_window(super::WIDGET_LABEL) {
+                        println!("[quota-preview] glass={} size={:?}", super::platform::glass(), window.inner_size());
+                    }
+                    handle.exit(0);
+                });
+                Ok(())
+            })
+            .build(context).unwrap().run_return(|_, _| {});
+    }
 
     #[test]
     fn position_off_the_desktop_falls_back_to_default() {

@@ -26,21 +26,31 @@ pub async fn agy_account_quota(
     agy_quota(&state.0, Some(&account_id)).await
 }
 
-/// Antigravity 官方登录的额度。指定账号就查它；不指定就查 agy 现在登着的号。都用 CC Switch
-/// 存的令牌直接问 Google（约 1 秒），认不出 agy 的登录、或这个平台不能切号时，改问 agy 的
-/// `/usage`（要先启动 agy，七八秒）。不能切号的平台忽略绑定，和打开终端一致。
+/// Antigravity 官方登录的额度。指定账号就查它；不指定就查 agy 现在登着的号。macOS 及 Windows
+/// 从 CC Switch 保存的令牌直接查询；其他平台继续通过 agy 的 `/usage` 查询。
 pub(crate) async fn agy_quota(
     manager: &AgyAccountManager,
     account_id: Option<&str>,
 ) -> Result<SubscriptionQuota, String> {
-    if !crate::services::agy_account::keychain::supported() {
+    if !crate::services::agy_account::keychain::quota_read_supported() {
         return crate::services::subscription_agy::get_agy_subscription_quota().await;
     }
     let result = match account_id {
         Some(account_id) => manager.quota(account_id).await,
         None => match manager.live_quota().await {
-            Some(result) => result,
-            None => return Ok(SubscriptionQuota::not_found(TOOL)),
+            Ok(Some(tiers)) => Ok(tiers),
+            Ok(None) => {
+                // Windows 后台只读系统凭据，绝不以启动 agy 作为兜底；macOS 保留原有后备路径。
+                #[cfg(target_os = "windows")]
+                return Ok(SubscriptionQuota::error(
+                    TOOL,
+                    CredentialStatus::NotFound,
+                    "No Antigravity sign-in was found in the system credential store".into(),
+                ));
+                #[cfg(not(target_os = "windows"))]
+                return crate::services::subscription_agy::get_agy_subscription_quota().await;
+            }
+            Err(error) => Err(error),
         },
     };
     Ok(match result {
@@ -56,6 +66,13 @@ pub(crate) async fn agy_quota(
             error: None,
             queried_at: Some(chrono::Utc::now().timestamp_millis()),
         },
+        Err(AccountQuotaError::NotFound) if cfg!(target_os = "windows") => {
+            SubscriptionQuota::error(
+                TOOL,
+                CredentialStatus::NotFound,
+                "The requested Antigravity account was not found in the local account store".into(),
+            )
+        }
         Err(AccountQuotaError::NotFound) => SubscriptionQuota::not_found(TOOL),
         Err(AccountQuotaError::NeedsReauth) => SubscriptionQuota::error(
             TOOL,

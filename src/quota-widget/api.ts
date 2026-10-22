@@ -117,6 +117,8 @@ export interface AgyQuotaTier {
 export interface AgyAccountQuota {
   success: boolean;
   tiers: AgyQuotaTier[];
+  error?: string | null;
+  credentialStatus?: string;
 }
 
 /** 后端 `quota_widget_ready` 的回执：背后是哪种玻璃、什么平台。 */
@@ -133,6 +135,8 @@ export const quotaWidgetApi = {
   /** 前端加载完成：摆好位置和尺寸后显示，拿回玻璃模式 */
   ready: (position: WidgetPosition | null, width: number, height: number) =>
     invoke<WidgetGlass>("quota_widget_ready", { position, width, height }),
+  appearance: (dark: boolean) =>
+    invoke<WidgetGlass>("quota_widget_appearance", { dark }),
   /** 内容变了：窗口跟着改尺寸 */
   layout: (width: number, height: number) =>
     invoke<void>("quota_widget_layout", { width, height }),

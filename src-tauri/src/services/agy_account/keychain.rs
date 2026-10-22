@@ -76,8 +76,19 @@ impl SystemKeychain {
     }
 }
 
+/// Whether the platform can switch the active agy login.
 pub fn supported() -> bool {
+    cfg!(target_os = "macos")
+}
+
+/// Whether the platform can read agy's active login for quota queries.
+pub fn quota_read_supported() -> bool {
     cfg!(any(target_os = "macos", target_os = "windows"))
+}
+
+fn decode_credential_blob(blob: &[u8]) -> Result<String, AppError> {
+    String::from_utf8(blob.to_vec())
+        .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))
 }
 
 #[cfg(target_os = "macos")]
@@ -189,7 +200,7 @@ mod windows {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
     use windows_sys::Win32::Security::Credentials::{
-        CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_ENTERPRISE, CRED_TYPE_GENERIC,
+        CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
     };
 
     use crate::error::AppError;
@@ -200,6 +211,16 @@ mod windows {
 
     fn target_name(service: &str, account: &str) -> Vec<u16> {
         to_wide(&format!("{service}:{account}"))
+    }
+
+    const MAX_CREDENTIAL_BLOB_SIZE: usize = 5 * 512;
+
+    struct CredentialGuard(*mut CREDENTIALW);
+
+    impl Drop for CredentialGuard {
+        fn drop(&mut self) {
+            unsafe { CredFree(self.0.cast()) };
+        }
     }
 
     pub fn read(service: &str, account: &str) -> Result<Option<String>, AppError> {
@@ -215,50 +236,32 @@ mod windows {
                     "读取 Windows 凭据管理器失败（错误码 {err}）"
                 )));
             }
-            if cred_ptr.is_null() {
-                return Ok(None);
-            }
-            let cred = *cred_ptr;
-            let blob_slice = std::slice::from_raw_parts(
-                cred.CredentialBlob,
-                cred.CredentialBlobSize as usize,
-            );
-            // go-keyring 在 Windows 上以 UTF-8 字节存入凭据
-            let value = String::from_utf8(blob_slice.to_vec())
-                .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))?;
-            CredFree(cred_ptr as *const core::ffi::c_void);
-            let value = value.trim().to_string();
-            Ok((!value.is_empty()).then_some(value))
         }
-    }
-
-    pub fn write(service: &str, account: &str, value: &str) -> Result<(), AppError> {
-        let mut target = target_name(service, account);
-        let mut user_name = to_wide(account);
-        let blob = value.as_bytes();
-        let cred = CREDENTIALW {
-            Flags: 0,
-            Type: CRED_TYPE_GENERIC,
-            TargetName: target.as_mut_ptr(),
-            Comment: std::ptr::null_mut(),
-            LastWritten: unsafe { std::mem::zeroed() },
-            CredentialBlobSize: blob.len() as u32,
-            CredentialBlob: blob.as_ptr() as *mut u8,
-            Persist: CRED_PERSIST_ENTERPRISE,
-            AttributeCount: 0,
-            Attributes: std::ptr::null_mut(),
-            TargetAlias: std::ptr::null_mut(),
-            UserName: user_name.as_mut_ptr(),
+        if cred_ptr.is_null() {
+            return Err(AppError::Config("Windows 凭据管理器返回了空凭据".into()));
+        }
+        let _credential = CredentialGuard(cred_ptr);
+        let cred = unsafe { &*cred_ptr };
+        let blob_size = cred.CredentialBlobSize as usize;
+        if blob_size > MAX_CREDENTIAL_BLOB_SIZE {
+            return Err(AppError::Config(
+                "Windows 凭据管理器返回了超出限制的 Antigravity 登录数据".into(),
+            ));
+        }
+        if blob_size > 0 && cred.CredentialBlob.is_null() {
+            return Err(AppError::Config(
+                "Windows 凭据管理器返回了无效的 Antigravity 登录数据".into(),
+            ));
+        }
+        let blob = if blob_size == 0 {
+            Vec::new()
+        } else {
+            unsafe { std::slice::from_raw_parts(cred.CredentialBlob, blob_size) }.to_vec()
         };
-        unsafe {
-            if CredWriteW(&cred, 0) == 0 {
-                let err = GetLastError();
-                return Err(AppError::Config(format!(
-                    "写入 Windows 凭据管理器失败（错误码 {err}）"
-                )));
-            }
-        }
-        Ok(())
+        drop(_credential);
+        // go-keyring 在 Windows 上以 UTF-8 字节存入凭据；转换前先释放系统分配的结构。
+        // 空 blob 仍作为已存在的空值返回，由上层识别为无效登录，而不是误报为未登录。
+        super::decode_credential_blob(&blob).map(Some)
     }
 }
 
@@ -285,7 +288,8 @@ impl AgyLoginStore for SystemKeychain {
         }
         #[cfg(target_os = "windows")]
         {
-            windows::write(self.service, self.account, value)
+            let _ = value;
+            Err(unsupported_error())
         }
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
@@ -298,8 +302,8 @@ impl AgyLoginStore for SystemKeychain {
 pub fn unsupported_error() -> AppError {
     AppError::localized(
         "agy.account.unsupported_platform",
-        "切换 Antigravity 账号目前只支持 macOS 和 Windows",
-        "Switching Antigravity accounts is only supported on macOS and Windows for now",
+        "切换 Antigravity 账号目前只支持 macOS",
+        "Switching Antigravity accounts is only supported on macOS for now",
     )
 }
 
@@ -322,5 +326,24 @@ mod tests {
         assert!(decode("go-keyring-base64:!!!").is_err());
         assert!(decode("[1,2]").is_err());
         assert!(decode("not json").is_err());
+    }
+
+    #[test]
+    fn decodes_windows_credential_blobs_without_accepting_invalid_or_empty_values() {
+        assert_eq!(
+            decode_credential_blob(br#"{"token":{}}"#).unwrap(),
+            r#"{"token":{}}"#
+        );
+        assert!(decode_credential_blob(&[]).unwrap().is_empty());
+        assert!(decode_credential_blob(&[0xff]).is_err());
+    }
+
+    #[test]
+    fn separates_switching_support_from_quota_read_support() {
+        assert_eq!(supported(), cfg!(target_os = "macos"));
+        assert_eq!(
+            quota_read_supported(),
+            cfg!(any(target_os = "macos", target_os = "windows"))
+        );
     }
 }

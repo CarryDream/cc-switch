@@ -406,6 +406,8 @@ export interface Settings {
   enableLocalProxy?: boolean;
   // 是否在主页面显示 Stack 模式开关（默认关闭）。和 enableLocalProxy 二选一，只影响 Claude Code、Codex
   enableStackMode?: boolean;
+  // Whether the quota widget is enabled (tray-owned setting)
+  enableQuotaWidget?: boolean;
   // User has confirmed the local proxy first-run notice
   proxyConfirmed?: boolean;
   // User has confirmed the usage query first-run notice

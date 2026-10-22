@@ -51,6 +51,8 @@ fn merge_settings_for_save(
     // 客户端地址只经 set_proxy_client_host 保存（它还要重写客户端）；全量保存带的是前端
     // 缓存里的旧值，透传会把刚保存的地址冲掉。
     incoming.proxy_client_host = existing.proxy_client_host.clone();
+    // 配额 widget 开关由托盘独立修改；设置页的全量保存可能携带过期缓存值。
+    incoming.enable_quota_widget = existing.enable_quota_widget;
     incoming
 }
 
@@ -417,6 +419,24 @@ mod tests {
         let merged = merge_settings_for_save(AppSettings::default(), &existing);
 
         assert_eq!(merged.proxy_client_host.as_deref(), Some("172.25.144.1"));
+    }
+
+    #[test]
+    fn save_settings_should_preserve_tray_owned_quota_widget_state_over_stale_values() {
+        for (existing_value, stale_incoming_value) in [(true, false), (false, true)] {
+            let existing = AppSettings {
+                enable_quota_widget: existing_value,
+                ..AppSettings::default()
+            };
+            let incoming = AppSettings {
+                enable_quota_widget: stale_incoming_value,
+                ..AppSettings::default()
+            };
+
+            let merged = merge_settings_for_save(incoming, &existing);
+
+            assert_eq!(merged.enable_quota_widget, existing_value);
+        }
     }
 
     #[test]

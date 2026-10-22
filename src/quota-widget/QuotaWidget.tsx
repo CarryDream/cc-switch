@@ -13,6 +13,7 @@ import {
 import { formatResetIn, formatResetWhen } from "./formatReset";
 import { readSavedPosition, savePosition } from "./position";
 import { useWidgetTheme } from "./useWidgetTheme";
+import { QuotaBar } from "./QuotaBar";
 
 /** 数据多久刷新一次（刷新缓存 → 取状态一次往返）。 */
 const REFRESH_INTERVAL = 60_000;
@@ -51,68 +52,6 @@ function primaryLine(lines: PanelQuotaLine[]): PanelQuotaLine | null {
 /** 一档在进度条里的形态：剩余百分比（0–100）。 */
 interface TierBar {
   left: number;
-}
-
-function tierStatus(left: number): "normal" | "warn" | "danger" {
-  if (left <= 0) return "danger";
-  if (left < 20) return "warn";
-  return "normal";
-}
-
-/**
- * 统一所有行的进度槽容器（高度严格统一 3.5px）：
- * - 双档（5h + 7d）：同轨层叠，底层浅色周额度，顶层深色 5h，一槽看尽两档
- * - 单档：同轨同高由深色条填充
- */
-function UnifiedBar({
-  dual,
-  pct,
-  isWarn,
-  isExhausted,
-}: {
-  dual?: { fiveHour: TierBar; weekly: TierBar } | null;
-  pct?: number | null;
-  isWarn: boolean;
-  isExhausted: boolean;
-}) {
-  if (dual) {
-    const width5h = `${Math.max(2, Math.min(100, dual.fiveHour.left))}%`;
-    const widthWeekly = `${Math.max(2, Math.min(100, dual.weekly.left))}%`;
-    return (
-      <div className="qw-bar-track" data-tauri-drag-region>
-        {/* 底层：周额度 (浅色透亮) */}
-        <div
-          className="qw-bar-fill qw-bar-weekly"
-          data-status={tierStatus(dual.weekly.left)}
-          style={{ width: widthWeekly }}
-        />
-        {/* 顶层：5小时额度 (深色饱满) */}
-        <div
-          className="qw-bar-fill qw-bar-5h"
-          data-status={tierStatus(dual.fiveHour.left)}
-          style={{ width: width5h }}
-        />
-      </div>
-    );
-  }
-
-  if (pct != null) {
-    return (
-      <div
-        className="qw-bar-track"
-        data-danger={isExhausted}
-        data-tauri-drag-region
-      >
-        <div
-          className="qw-bar-fill qw-bar-5h"
-          data-status={isExhausted ? "danger" : isWarn ? "warn" : "normal"}
-          style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
-        />
-      </div>
-    );
-  }
-
-  return null;
 }
 
 /** 双档行的瓶颈档：剩余更少的那个（任一用尽时即 0%），即当前真实可用量。 */
@@ -236,11 +175,14 @@ function QuotaRow({
         </span>
       </div>
       {dual || pct != null ? (
-        <UnifiedBar
-          dual={dual}
-          pct={pct}
-          isWarn={isWarn}
-          isExhausted={isExhausted}
+        <QuotaBar
+          left={dual?.fiveHour.left ?? pct ?? 0}
+          label={fiveHourLine ? texts.tierFiveHour : (primary?.text ?? "")}
+          weekly={
+            dual
+              ? { left: dual.weekly.left, label: texts.tierWeekly }
+              : undefined
+          }
         />
       ) : quota.note ? (
         <div className="qw-note" title={quota.note}>
@@ -279,7 +221,10 @@ function AgyRow({
   );
   const dual =
     fiveHourTier && weeklyTier
-      ? { fiveHour: { left: leftOf(fiveHourTier) }, weekly: { left: leftOf(weeklyTier) } }
+      ? {
+          fiveHour: { left: leftOf(fiveHourTier) },
+          weekly: { left: leftOf(weeklyTier) },
+        }
       : null;
 
   const bottleneckTier = dual
@@ -327,11 +272,14 @@ function AgyRow({
           {left}%
         </span>
       </div>
-      <UnifiedBar
-        dual={dual}
-        pct={left}
-        isWarn={isWarn}
-        isExhausted={isExhausted}
+      <QuotaBar
+        left={dual?.fiveHour.left ?? left}
+        label={
+          dual ? texts.tierFiveHour : agyTierLabel(bottleneckTier.name, texts)
+        }
+        weekly={
+          dual ? { left: dual.weekly.left, label: texts.tierWeekly } : undefined
+        }
       />
     </div>
   );
@@ -472,32 +420,34 @@ function Skeleton() {
 }
 
 export function QuotaWidget() {
-  useWidgetTheme();
+  const dark = useWidgetTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TrayPanelState | null>(null);
   const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isHovered, setIsHovered] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const lastDownAt = useRef(0);
+  const [agyError, setAgyError] = useState<string | null>(null);
+  const lastDownAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const onFocus = () => setIsFocused(true);
-    const onBlur = () => setIsFocused(false);
-    window.addEventListener("focus", onFocus);
+    const onBlur = () => setIsHovered(false);
     window.addEventListener("blur", onBlur);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("blur", onBlur);
-    };
+    return () => window.removeEventListener("blur", onBlur);
+  }, []);
+
+  // 悬浮窗是信息面板不是网页，屏蔽系统右键菜单（复制/检查等）
+  useEffect(() => {
+    const block = (e: Event) => e.preventDefault();
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
   }, []);
 
   // 双击打开主窗口：mousedown 先于拖动生效，两次点按间隔够近就当双击
   const onCardMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const at = performance.now();
-    if (at - lastDownAt.current < DBLCLICK_MS) {
-      lastDownAt.current = 0;
+    if (lastDownAt.current !== null && at - lastDownAt.current < DBLCLICK_MS) {
+      lastDownAt.current = null;
       void quotaWidgetApi.showMain().catch(() => {});
     } else {
       lastDownAt.current = at;
@@ -524,6 +474,19 @@ export function QuotaWidget() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void quotaWidgetApi
+      .appearance(dark)
+      .then((info) => {
+        if (active) document.documentElement.dataset.glass = info.glass;
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [dark]);
 
   // 拖动后记住位置（物理像素）
   useEffect(() => {
@@ -577,11 +540,18 @@ export function QuotaWidget() {
     const load = async () => {
       try {
         const quota = await quotaWidgetApi.agyQuota();
-        if (alive && quota.success && quota.tiers.length > 0) {
+        if (!alive) return;
+        if (quota.success && quota.tiers.length > 0) {
           setAgyTiers(quota.tiers);
+          setAgyError(null);
+        } else {
+          setAgyTiers(null);
+          setAgyError(quota.error ?? "Antigravity: quota unavailable");
         }
-      } catch {
-        // 没登录 / 查询失败：保持现状
+      } catch (error) {
+        if (!alive) return;
+        setAgyTiers(null);
+        setAgyError(String(error));
       }
     };
     void load();
@@ -615,14 +585,18 @@ export function QuotaWidget() {
   const texts = state?.texts;
   const quotaTargets = collectQuotaTargets(state?.apps ?? []);
   const hasAgy = Boolean(agyTiers && agyTiers.length > 0);
-  const isEmpty = quotaTargets.length === 0 && !hasAgy;
+  const isEmpty = quotaTargets.length === 0 && !hasAgy && !agyError;
+  const hasWeekly =
+    quotaTargets.some((target) =>
+      target.quota.lines.some((line) => line.tier === "weekly"),
+    ) || Boolean(agyTiers?.some((tier) => /weekly|seven_day/.test(tier.name)));
 
   return (
     <div
       ref={rootRef}
       className="qw-card"
       data-tauri-drag-region
-      data-active={isHovered || isFocused}
+      data-active={isHovered}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseDown={onCardMouseDown}
@@ -644,6 +618,23 @@ export function QuotaWidget() {
             />
           ))}
           {renderAgyRows(agyTiers, texts, now)}
+          {agyError && (
+            <div className="qw-note" title={agyError} data-tauri-drag-region>
+              Antigravity · {agyError}
+            </div>
+          )}
+          {hasWeekly && (
+            <div className="qw-legend" data-tauri-drag-region>
+              <span>
+                <i className="qw-key-fill" />
+                {texts.tierFiveHour}
+              </span>
+              <span>
+                <i className="qw-key-marker" />
+                {texts.tierWeekly}
+              </span>
+            </div>
+          )}
         </>
       )}
     </div>

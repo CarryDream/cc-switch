@@ -513,7 +513,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(window_state_flags())
-                .with_denylist(&[tray_panel::PANEL_LABEL])
+                .with_denylist(&[tray_panel::PANEL_LABEL, quota_widget::WIDGET_LABEL])
                 .build(),
         )
         .setup(|app| {
@@ -1728,6 +1728,7 @@ pub fn run() {
             tray_panel::tray_panel_hide,
             tray_panel::tray_panel_action,
             quota_widget::quota_widget_ready,
+            quota_widget::quota_widget_appearance,
             quota_widget::quota_widget_layout,
             quota_widget::quota_widget_refresh,
             quota_widget::quota_widget_hide,
