@@ -33,10 +33,15 @@ interface QuotaTarget {
   attention?: boolean;
 }
 
-/** 主行：5 小时那档优先，没有就退到第一条有百分比或用量信息的行。 */
+/**
+ * 主行：某一档用尽（0%）时它就是瓶颈，优先显示它（0% 红色 + 该档的重置倒计时，
+ * 例如周额度用尽时模型实际不可用，仍显示 5 小时满额会误导）；否则 5 小时那档优先，
+ * 再退到第一条有百分比的行。
+ */
 function primaryLine(lines: PanelQuotaLine[]): PanelQuotaLine | null {
   if (!lines || lines.length === 0) return null;
   return (
+    lines.find((line) => line.left != null && line.left <= 0) ??
     lines.find((line) => line.tier === "five_hour") ??
     lines.find((line) => line.left != null) ??
     lines[0]
@@ -233,6 +238,20 @@ function AgyRow({
   );
 }
 
+/**
+ * Antigravity 的主行：某一档用尽时它就是瓶颈（周额度用尽 → 模型实际不可用，
+ * 仍显示 5 小时满额会误导），优先显示那一档；否则 5 小时那档。
+ */
+function pickAgyPrimary(tiers: AgyQuotaTier[]): AgyQuotaTier {
+  const leftOf = (t: AgyQuotaTier) =>
+    Math.max(0, Math.min(100, Math.round(100 - t.utilization)));
+  return (
+    tiers.find((t) => leftOf(t) === 0) ??
+    tiers.find((t) => t.name.includes("five_hour") || t.name.includes("5h")) ??
+    tiers[0]
+  );
+}
+
 function renderAgyRows(
   tiers: AgyQuotaTier[] | null,
   texts: PanelTexts,
@@ -268,7 +287,9 @@ function renderAgyRows(
         <AgyRow
           key="agy-claude"
           name="Antigravity (Claude)"
-          primaryTier={claude5h}
+          primaryTier={pickAgyPrimary(
+            claudeTiers.length > 0 ? claudeTiers : tiers,
+          )}
           allTiers={claudeTiers.length > 0 ? claudeTiers : tiers}
           texts={texts}
           now={now}
@@ -276,7 +297,9 @@ function renderAgyRows(
         <AgyRow
           key="agy-gemini"
           name="Antigravity (Gemini)"
-          primaryTier={gemini5h}
+          primaryTier={pickAgyPrimary(
+            geminiTiers.length > 0 ? geminiTiers : tiers,
+          )}
           allTiers={geminiTiers.length > 0 ? geminiTiers : tiers}
           texts={texts}
           now={now}
@@ -285,15 +308,11 @@ function renderAgyRows(
     );
   }
 
-  const primary =
-    tiers.find(
-      (t) => t.name.includes("five_hour") || t.name.includes("5h"),
-    ) ?? tiers[0];
   return (
     <AgyRow
       key="agy-single"
       name="Antigravity"
-      primaryTier={primary}
+      primaryTier={pickAgyPrimary(tiers)}
       allTiers={tiers}
       texts={texts}
       now={now}
