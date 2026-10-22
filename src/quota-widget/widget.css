@@ -175,6 +175,71 @@ html.dark .qw-bar[data-danger="true"] {
   background: #ef4444;
 }
 
+/* ── 双色进度条：5 小时（上、深）+ 周额度（下、浅）叠在同一个进度里 ── */
+.qw-bar2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.qw-track {
+  height: 2px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+html.dark .qw-track {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.qw-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+/* 正常：蓝色系。5 小时用深色，周额度用浅色 */
+.qw-fill[data-kind="five_hour"][data-status="normal"] {
+  background: #0284c7;
+}
+.qw-fill[data-kind="weekly"][data-status="normal"] {
+  background: #7dd3fc;
+}
+html.dark .qw-fill[data-kind="five_hour"][data-status="normal"] {
+  background: #0ea5e9;
+}
+html.dark .qw-fill[data-kind="weekly"][data-status="normal"] {
+  background: #7dd3fc;
+}
+
+/* 不足 20%：琥珀色系 */
+.qw-fill[data-kind="five_hour"][data-status="warn"] {
+  background: #b45309;
+}
+.qw-fill[data-kind="weekly"][data-status="warn"] {
+  background: #fbbf24;
+}
+html.dark .qw-fill[data-kind="five_hour"][data-status="warn"] {
+  background: #f59e0b;
+}
+html.dark .qw-fill[data-kind="weekly"][data-status="warn"] {
+  background: #fde68a;
+}
+
+/* 用尽：红色系 */
+.qw-fill[data-kind="five_hour"][data-status="danger"] {
+  background: #dc2626;
+}
+.qw-fill[data-kind="weekly"][data-status="danger"] {
+  background: #f87171;
+}
+html.dark .qw-fill[data-kind="five_hour"][data-status="danger"] {
+  background: #ef4444;
+}
+html.dark .qw-fill[data-kind="weekly"][data-status="danger"] {
+  background: #fca5a5;
+}
+
 /* 需要处理的小圆点（配色同托盘的问题圆点） */
 .qw-attention {
   width: 5px;

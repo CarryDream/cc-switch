@@ -48,6 +48,50 @@ function primaryLine(lines: PanelQuotaLine[]): PanelQuotaLine | null {
   );
 }
 
+/** 一档在进度条里的形态：剩余百分比（0–100）。 */
+interface TierBar {
+  left: number;
+}
+
+function tierStatus(left: number): "normal" | "warn" | "danger" {
+  if (left <= 0) return "danger";
+  if (left < 20) return "warn";
+  return "normal";
+}
+
+/**
+ * 5 小时 + 周额度的双色进度条：上深下浅两条细轨叠在同一个进度里，
+ * 各自按剩余量变色（正常蓝、不足 20% 琥珀、用尽红）。
+ */
+function DualBar({ fiveHour, weekly }: { fiveHour: TierBar; weekly: TierBar }) {
+  const width = (t: TierBar) => `${Math.max(2, Math.min(100, t.left))}%`;
+  return (
+    <div className="qw-bar2" data-tauri-drag-region>
+      <div className="qw-track" data-tauri-drag-region>
+        <div
+          className="qw-fill"
+          data-kind="five_hour"
+          data-status={tierStatus(fiveHour.left)}
+          style={{ width: width(fiveHour) }}
+        />
+      </div>
+      <div className="qw-track" data-tauri-drag-region>
+        <div
+          className="qw-fill"
+          data-kind="weekly"
+          data-status={tierStatus(weekly.left)}
+          style={{ width: width(weekly) }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** 双档行的瓶颈档：剩余更少的那个（任一用尽时即 0%），即当前真实可用量。 */
+function bottleneck(fiveHour: TierBar, weekly: TierBar): TierBar {
+  return fiveHour.left <= weekly.left ? fiveHour : weekly;
+}
+
 /** Antigravity 额度的档位名（`five_hour` / `seven_day_*` 等）→ 本地档名。 */
 function agyTierLabel(name: string, texts: PanelTexts): string {
   if (name.includes("five_hour") || name.includes("5h"))
@@ -92,10 +136,40 @@ function QuotaRow({
   now: number;
 }) {
   const quota = target.quota;
-  const primary = primaryLine(quota.lines);
-  const rawPct = primary?.left;
-  const pct =
-    rawPct != null ? Math.max(0, Math.min(100, Math.round(rawPct))) : null;
+  // 双档（5 小时 + 周）：双色条一起画，数值和倒计时按瓶颈档（剩余更少者）写
+  const fiveHourLine = quota.lines.find(
+    (line) => line.tier === "five_hour" && line.left != null,
+  );
+  const weeklyLine = quota.lines.find(
+    (line) => line.tier === "weekly" && line.left != null,
+  );
+  const dual =
+    fiveHourLine && weeklyLine
+      ? {
+          fiveHour: { left: Math.round(fiveHourLine.left!) },
+          weekly: { left: Math.round(weeklyLine.left!) },
+        }
+      : null;
+
+  const primary = dual
+    ? null
+    : primaryLine(quota.lines);
+  const pct = dual
+    ? bottleneck(dual.fiveHour, dual.weekly).left
+    : primary?.left != null
+      ? Math.max(0, Math.min(100, Math.round(primary.left)))
+      : null;
+
+  // 倒计时跟瓶颈档：双档取剩余更少者（用尽的档必然是瓶颈），单档用主行
+  const resetSource = dual
+    ? (bottleneck(dual.fiveHour, dual.weekly).left === dual.fiveHour.left
+        ? fiveHourLine
+        : weeklyLine)!
+    : primary;
+  const reset =
+    resetSource?.resetsAt != null
+      ? formatResetWhen(resetSource.resetsAt, now, texts)
+      : null;
 
   // 用完判定：明确为 0，或文本包含已用尽/用完/used up
   const isExhausted =
@@ -105,12 +179,7 @@ function QuotaRow({
         primary?.text.includes("用完") ||
         primary?.text.toLowerCase().includes("used up"),
     );
-  const isWarn = Boolean(primary?.warn) && !isExhausted;
-
-  const reset =
-    primary?.resetsAt != null
-      ? formatResetWhen(primary.resetsAt, now, texts)
-      : null;
+  const isWarn = pct != null && !isExhausted && pct < 20;
 
   return (
     <div
@@ -140,7 +209,9 @@ function QuotaRow({
           {pct != null ? `${pct}%` : isExhausted ? "0%" : "—"}
         </span>
       </div>
-      {pct != null ? (
+      {dual ? (
+        <DualBar fiveHour={dual.fiveHour} weekly={dual.weekly} />
+      ) : pct != null ? (
         <div
           className="qw-bar"
           data-danger={isExhausted}
@@ -176,23 +247,39 @@ function AgyRow({
   texts: PanelTexts;
   now: number;
 }) {
-  const left = Math.max(
-    0,
-    Math.min(100, Math.round(100 - primaryTier.utilization)),
+  const leftOf = (tier: AgyQuotaTier) =>
+    Math.max(0, Math.min(100, Math.round(100 - tier.utilization)));
+  // 双档（5 小时 + 周）：双色条一起画；数值和倒计时按瓶颈档（剩余更少者）写
+  const fiveHourTier = allTiers.find(
+    (t) => t.name.includes("five_hour") || t.name.includes("5h"),
   );
+  const weeklyTier = allTiers.find(
+    (t) =>
+      t.name.includes("seven_day") ||
+      t.name.includes("weekly") ||
+      t.name.includes("week"),
+  );
+  const dual =
+    fiveHourTier && weeklyTier
+      ? { fiveHour: { left: leftOf(fiveHourTier) }, weekly: { left: leftOf(weeklyTier) } }
+      : null;
+
+  const bottleneckTier = dual
+    ? bottleneck(dual.fiveHour, dual.weekly).left === dual.fiveHour.left
+      ? fiveHourTier!
+      : weeklyTier!
+    : primaryTier;
+  const left = leftOf(bottleneckTier);
   const isExhausted = left === 0;
   const isWarn = left < 20 && !isExhausted;
-  const reset = primaryTier.resetsAt
-    ? formatResetWhen(primaryTier.resetsAt, now, texts)
+  const reset = bottleneckTier.resetsAt
+    ? formatResetWhen(bottleneckTier.resetsAt, now, texts)
     : null;
 
   const tooltip = [
     name,
     ...allTiers.map((tier) => {
-      const tLeft = Math.max(
-        0,
-        Math.min(100, Math.round(100 - tier.utilization)),
-      );
+      const tLeft = leftOf(tier);
       const tReset = tier.resetsAt
         ? formatResetIn(tier.resetsAt, now, texts)
         : null;
@@ -222,18 +309,22 @@ function AgyRow({
           {left}%
         </span>
       </div>
-      <div
-        className="qw-bar"
-        data-danger={isExhausted}
-        data-tauri-drag-region
-      >
+      {dual ? (
+        <DualBar fiveHour={dual.fiveHour} weekly={dual.weekly} />
+      ) : (
         <div
-          className="qw-bar-fill"
-          data-warn={isWarn}
+          className="qw-bar"
           data-danger={isExhausted}
-          style={{ width: `${Math.max(2, left)}%` }}
-        />
-      </div>
+          data-tauri-drag-region
+        >
+          <div
+            className="qw-bar-fill"
+            data-warn={isWarn}
+            data-danger={isExhausted}
+            style={{ width: `${Math.max(2, left)}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
