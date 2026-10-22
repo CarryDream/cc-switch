@@ -36,6 +36,8 @@ pub async fn get_agy_models(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Antigravity CLI not found; install agy first".to_string())?;
     let mut command = tokio::process::Command::new(path);
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     command
         .kill_on_drop(true)
         .env_remove("GEMINI_API_KEY")
