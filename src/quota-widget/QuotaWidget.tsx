@@ -60,9 +60,9 @@ function tierStatus(left: number): "normal" | "warn" | "danger" {
 }
 
 /**
- * 统一所有行的进度槽容器（高度严格统一 5px）：
- * - 双档（5h + 7d）：同槽双层呈现，上层深色 5h，下层浅色周额度
- * - 单档：同槽 5px 全高实色填充
+ * 统一所有行的进度槽容器（高度严格统一 3.5px）：
+ * - 双档（5h + 7d）：同轨层叠，底层浅色周额度，顶层深色 5h，一槽看尽两档
+ * - 单档：同轨同高由深色条填充
  */
 function UnifiedBar({
   dual,
@@ -80,15 +80,17 @@ function UnifiedBar({
     const widthWeekly = `${Math.max(2, Math.min(100, dual.weekly.left))}%`;
     return (
       <div className="qw-bar-track" data-tauri-drag-region>
+        {/* 底层：周额度 (浅色透亮) */}
         <div
-          className="qw-bar-split qw-bar-5h"
-          data-status={tierStatus(dual.fiveHour.left)}
-          style={{ width: width5h }}
-        />
-        <div
-          className="qw-bar-split qw-bar-weekly"
+          className="qw-bar-fill qw-bar-weekly"
           data-status={tierStatus(dual.weekly.left)}
           style={{ width: widthWeekly }}
+        />
+        {/* 顶层：5小时额度 (深色饱满) */}
+        <div
+          className="qw-bar-fill qw-bar-5h"
+          data-status={tierStatus(dual.fiveHour.left)}
+          style={{ width: width5h }}
         />
       </div>
     );
@@ -102,9 +104,8 @@ function UnifiedBar({
         data-tauri-drag-region
       >
         <div
-          className="qw-bar-fill-full"
-          data-warn={isWarn}
-          data-danger={isExhausted}
+          className="qw-bar-fill qw-bar-5h"
+          data-status={isExhausted ? "danger" : isWarn ? "warn" : "normal"}
           style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
         />
       </div>
@@ -472,7 +473,6 @@ function Skeleton() {
 
 export function QuotaWidget() {
   useWidgetTheme();
-  const stageRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TrayPanelState | null>(null);
   const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
@@ -507,12 +507,12 @@ export function QuotaWidget() {
   // 加载完成：摆好存下的位置和首屏尺寸，后端随即显示窗口；拿回玻璃模式选配色
   useEffect(() => {
     let cancelled = false;
-    const stage = stageRef.current;
+    const el = rootRef.current;
     quotaWidgetApi
       .ready(
         readSavedPosition(),
-        stage?.offsetWidth ?? 264,
-        stage?.offsetHeight ?? 110,
+        el?.offsetWidth ?? 240,
+        el?.offsetHeight ?? 96,
       )
       .then((info) => {
         if (cancelled) return;
@@ -592,20 +592,20 @@ export function QuotaWidget() {
     };
   }, []);
 
-  // 舞台尺寸变了窗口跟着改（ResizeObserver 监听外层 stage，包含阴影羽化空间，防止桌面投影被裁切）
+  // 卡片尺寸变了窗口跟着改（直接监听单个 card，无外层嵌套）
   useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
+    const el = rootRef.current;
+    if (!el) return;
     let timer: number | undefined;
     const observer = new ResizeObserver(() => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         void quotaWidgetApi
-          .layout(stage.offsetWidth, stage.offsetHeight)
+          .layout(el.offsetWidth, el.offsetHeight)
           .catch(() => {});
       }, REPORT_DEBOUNCE);
     });
-    observer.observe(stage);
+    observer.observe(el);
     return () => {
       observer.disconnect();
       window.clearTimeout(timer);
@@ -618,36 +618,34 @@ export function QuotaWidget() {
   const isEmpty = quotaTargets.length === 0 && !hasAgy;
 
   return (
-    <div ref={stageRef} className="qw-stage">
-      <div
-        ref={rootRef}
-        className="qw-card"
-        data-tauri-drag-region
-        data-active={isHovered || isFocused}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onMouseDown={onCardMouseDown}
-      >
-        {!state || !texts ? (
-          <Skeleton />
-        ) : isEmpty ? (
-          <div className="qw-empty" data-tauri-drag-region>
-            {texts.noMatch}
-          </div>
-        ) : (
-          <>
-            {quotaTargets.map((target) => (
-              <QuotaRow
-                key={target.key}
-                target={target}
-                texts={texts}
-                now={now}
-              />
-            ))}
-            {renderAgyRows(agyTiers, texts, now)}
-          </>
-        )}
-      </div>
+    <div
+      ref={rootRef}
+      className="qw-card"
+      data-tauri-drag-region
+      data-active={isHovered || isFocused}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onMouseDown={onCardMouseDown}
+    >
+      {!state || !texts ? (
+        <Skeleton />
+      ) : isEmpty ? (
+        <div className="qw-empty" data-tauri-drag-region>
+          {texts.noMatch}
+        </div>
+      ) : (
+        <>
+          {quotaTargets.map((target) => (
+            <QuotaRow
+              key={target.key}
+              target={target}
+              texts={texts}
+              now={now}
+            />
+          ))}
+          {renderAgyRows(agyTiers, texts, now)}
+        </>
+      )}
     </div>
   );
 }

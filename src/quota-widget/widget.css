@@ -1,16 +1,20 @@
 /* 额度悬浮窗：Apple 灵动液态玻璃 (Apple Liquid Glass)
-   - 物理质感：多层次水晶镜面高光倒角、光线入射折射描边、微凹导轨
+   - 极简单层玻璃：无任何内外多重边框套娃，纯净一块圆角悬浮晶体
+   - 物理质感：高透光高斯模糊（blur 20px / saturate 180%），极细微晶光倒角边缘
    - 动态焦点：
-       * 待机态 (离开焦点)：清晰独立的悬浮晶体，高对比轮廓与深层柔阴影，无论何种桌面壁纸均清澈醒目
-       * 聚焦态 (鼠标悬浮/点击)：流光聚拢、镜面高光瞬时聚焦、卡片轻微升起
-   - 单槽双层进度条：所有平台外框容器统一 5px 高度，双额度同槽分色叠合，单额度同槽全高填充 */
+       * 待机态 (离开焦点)：安静通透悬浮于桌面，轮廓分明，文字高清晰对比度
+       * 聚焦态 (鼠标悬浮/点击)：透光微升，高光微亮，轻度景深柔光展开
+   - 同轨双层进度条：所有平台行高绝对统一为 3.5px，双额度同轨融合展示 */
 
 html,
 body.quota-widget,
 body.quota-widget #root {
   height: 100%;
+  width: 100%;
   background: transparent !important;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 body.quota-widget {
@@ -19,135 +23,93 @@ body.quota-widget {
   cursor: default;
 }
 
-/* 舞台容器：预留阴影羽化空间，彻底杜绝外阴影被透明窗口边缘硬切 */
-.qw-stage {
-  padding: 8px 12px 14px 12px;
-  display: inline-flex;
-  background: transparent;
-}
-
+/* ── 唯独单层卡片主体 ── */
 .qw-card {
-  position: relative;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   width: 240px;
   max-height: 380px;
   overflow: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 13px;
-  border-radius: 14px;
+  padding: 8px 11px;
+  border-radius: 12px;
   color: hsl(var(--foreground));
   font-size: 10px;
   scrollbar-width: none;
   transition:
-    background 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    background 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Windows DWM 圆角规格 */
+/* Windows 系统圆角微调 */
 html[data-platform="windows"] .qw-card {
-  border-radius: 11px;
+  border-radius: 10px;
 }
 
 /* ==========================================================================
-   1. 苹果液态玻璃材质 (Apple Liquid Glass) - 浅色模式
+   1. 苹果液态玻璃单层材质
    ========================================================================== */
 
-/* ── 浅色：待机 / 离开焦点 (高透光水晶，深层投影落地，边界锐利醒目) ── */
+/* ── 浅色模式：待机态 ── */
 .qw-card {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.76) 0%,
-    rgba(245, 248, 255, 0.54) 50%,
-    rgba(234, 240, 252, 0.68) 100%
-  );
-  -webkit-backdrop-filter: blur(28px) saturate(200%) contrast(102%);
-  backdrop-filter: blur(28px) saturate(200%) contrast(102%);
+  background: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-    0 0 0 0.5px rgba(0, 0, 0, 0.08),
-    0 4px 16px -2px rgba(0, 0, 0, 0.16),
-    0 10px 26px -3px rgba(0, 0, 0, 0.12);
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-/* ── 浅色：悬浮 / 获得焦点 (流光聚焦，晶莹度提高，边缘晶体折射提亮) ── */
+/* ── 浅色模式：鼠标悬浮 / 获得焦点 ── */
 .qw-card:hover,
 .qw-card[data-active="true"] {
-  transform: translateY(-1.5px);
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.88) 0%,
-    rgba(248, 250, 255, 0.68) 50%,
-    rgba(238, 243, 255, 0.8) 100%
-  );
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(255, 255, 255, 0.85);
   box-shadow:
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.98),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
-    0 0 0 0.5px rgba(0, 0, 0, 0.12),
-    0 6px 20px -2px rgba(0, 0, 0, 0.2),
-    0 16px 36px -4px rgba(0, 0, 0, 0.16);
+    0 6px 20px rgba(0, 0, 0, 0.14),
+    0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* ==========================================================================
-   2. 苹果液态玻璃材质 (Apple Liquid Glass) - 深色模式
-   ========================================================================== */
-
-/* ── 深色：待机 / 离开焦点 (黑曜石液态玻璃，反光折射清晰，绝不发灰发虚) ── */
+/* ── 深色模式：待机态 ── */
 html.dark .qw-card {
-  background: linear-gradient(
-    145deg,
-    rgba(50, 54, 66, 0.76) 0%,
-    rgba(28, 31, 38, 0.68) 50%,
-    rgba(18, 20, 26, 0.84) 100%
-  );
-  -webkit-backdrop-filter: blur(28px) saturate(200%) contrast(105%);
-  backdrop-filter: blur(28px) saturate(200%) contrast(105%);
+  background: rgba(22, 24, 30, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.36),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 0 0 0.5px rgba(0, 0, 0, 0.4),
-    0 4px 18px -2px rgba(0, 0, 0, 0.52),
-    0 12px 30px -4px rgba(0, 0, 0, 0.44);
+    0 4px 18px rgba(0, 0, 0, 0.36),
+    0 1px 3px rgba(0, 0, 0, 0.24);
 }
 
-/* ── 深色：悬浮 / 获得焦点 (玻璃通透感与宝石流光升起) ── */
+/* ── 深色模式：鼠标悬浮 / 获得焦点 ── */
 html.dark .qw-card:hover,
 html.dark .qw-card[data-active="true"] {
-  transform: translateY(-1.5px);
-  background: linear-gradient(
-    145deg,
-    rgba(62, 68, 82, 0.86) 0%,
-    rgba(34, 38, 48, 0.78) 50%,
-    rgba(22, 25, 33, 0.92) 100%
-  );
+  background: rgba(28, 31, 40, 0.82);
+  border-color: rgba(255, 255, 255, 0.24);
   box-shadow:
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.52),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.26),
-    0 0 0 0.5px rgba(0, 0, 0, 0.5),
-    0 8px 26px -2px rgba(0, 0, 0, 0.65),
-    0 20px 42px -4px rgba(0, 0, 0, 0.55);
+    0 6px 22px rgba(0, 0, 0, 0.45),
+    0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* ==========================================================================
-   3. 排版与微徽章
+   2. 行与文字排版
    ========================================================================== */
 
 .qw-row {
   display: flex;
   flex-direction: column;
-  gap: 3.5px;
-  transition: opacity 0.2s ease;
+  gap: 3px;
 }
 
 .qw-row-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .qw-app-name {
@@ -159,35 +121,30 @@ html.dark .qw-card[data-active="true"] {
   font-size: 10px;
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.01em;
   color: hsl(var(--foreground));
   opacity: 0.9;
-  transition: opacity 0.2s ease;
 }
 .qw-card:hover .qw-app-name,
 .qw-card[data-active="true"] .qw-app-name {
   opacity: 1;
 }
 
-/* 优雅磨砂微胶囊药丸 (Frosted Glass Pill Badge) */
+/* 重置时间微胶囊药丸 (Frosted Glass Pill) */
 .qw-reset {
   flex-shrink: 0;
   font-size: 8.5px;
   line-height: 1;
-  padding: 1.5px 5.5px;
+  padding: 1px 4.5px;
   border-radius: 9999px;
   font-variant-numeric: tabular-nums;
   background: rgba(0, 0, 0, 0.05);
   color: hsl(var(--muted-foreground));
-  border: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
+  border: 0.5px solid rgba(0, 0, 0, 0.06);
 }
 html.dark .qw-reset {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.78);
-  box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
 }
 .qw-card:hover .qw-reset,
 .qw-card[data-active="true"] .qw-reset {
@@ -196,8 +153,8 @@ html.dark .qw-reset {
 }
 html.dark .qw-card:hover .qw-reset,
 html.dark .qw-card[data-active="true"] .qw-reset {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* 百分比数字 */
@@ -207,7 +164,6 @@ html.dark .qw-card[data-active="true"] .qw-reset {
   font-weight: 700;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
   color: hsl(var(--foreground));
 }
 
@@ -226,134 +182,87 @@ html.dark .qw-danger {
 }
 
 /* ==========================================================================
-   4. 统一高度 5px 进度槽：同槽双层与单档填充
+   3. 进度条：所有平台所有行绝对统一为 3.5px 高度
    ========================================================================== */
 
-/* 所有平台所有供应商统一外框容器：5px 微胶囊圆角槽，微凹磨砂光影 */
+/* 统一单根细槽 */
 .qw-bar-track {
   position: relative;
-  height: 5px;
+  height: 3.5px;
   width: 100%;
   border-radius: 9999px;
   background: rgba(0, 0, 0, 0.08);
-  box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.14);
   overflow: hidden;
 }
 html.dark .qw-bar-track {
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.32);
+  background: rgba(255, 255, 255, 0.1);
 }
 .qw-bar-track[data-danger="true"] {
-  background: rgba(220, 38, 38, 0.16);
+  background: rgba(220, 38, 38, 0.18);
 }
 html.dark .qw-bar-track[data-danger="true"] {
-  background: rgba(248, 113, 113, 0.2);
+  background: rgba(248, 113, 113, 0.22);
 }
 
-/* ── 双档同槽架构：上半槽 2.5px 5小时，下半槽 2.5px 每周 ── */
-.qw-bar-split {
+/* 填充条（单层或双层叠合） */
+.qw-bar-fill {
   position: absolute;
   left: 0;
-  border-radius: 9999px;
-  transition:
-    width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.25s ease;
-}
-
-/* 上半部：5 小时额度 (深色主条) */
-.qw-bar-5h {
   top: 0;
-  height: 2.5px;
-}
-.qw-bar-5h[data-status="normal"] {
-  background: linear-gradient(90deg, #0369a1 0%, #0284c7 100%);
-}
-html.dark .qw-bar-5h[data-status="normal"] {
-  background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
-  box-shadow: 0 0 4px rgba(56, 189, 248, 0.35);
-}
-.qw-bar-5h[data-status="warn"] {
-  background: linear-gradient(90deg, #b45309 0%, #d97706 100%);
-}
-html.dark .qw-bar-5h[data-status="warn"] {
-  background: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
-  box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
-}
-.qw-bar-5h[data-status="danger"] {
-  background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%);
-}
-html.dark .qw-bar-5h[data-status="danger"] {
-  background: linear-gradient(90deg, #b91c1c 0%, #ef4444 100%);
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+  bottom: 0;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 下半部：每周 / 7 天额度 (浅色辅条) */
-.qw-bar-weekly {
-  bottom: 0;
-  height: 2.5px;
-}
+/* ── 底层：每周额度 (浅色、柔和通透) ── */
 .qw-bar-weekly[data-status="normal"] {
-  background: linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%);
+  background: #38bdf8;
+  opacity: 0.6;
 }
 html.dark .qw-bar-weekly[data-status="normal"] {
-  background: linear-gradient(90deg, #38bdf8 0%, #bae6fd 100%);
-  box-shadow: 0 0 4px rgba(125, 211, 252, 0.28);
+  background: #7dd3fc;
+  opacity: 0.55;
 }
 .qw-bar-weekly[data-status="warn"] {
-  background: linear-gradient(90deg, #f59e0b 0%, #fde68a 100%);
+  background: #fde68a;
+  opacity: 0.75;
 }
 html.dark .qw-bar-weekly[data-status="warn"] {
-  background: linear-gradient(90deg, #f59e0b 0%, #fef08a 100%);
-  box-shadow: 0 0 5px rgba(254, 240, 138, 0.35);
+  background: #fef08a;
+  opacity: 0.7;
 }
 .qw-bar-weekly[data-status="danger"] {
-  background: linear-gradient(90deg, #ef4444 0%, #fca5a5 100%);
+  background: #fca5a5;
+  opacity: 0.75;
 }
 html.dark .qw-bar-weekly[data-status="danger"] {
-  background: linear-gradient(90deg, #ef4444 0%, #fecaca 100%);
-  box-shadow: 0 0 5px rgba(254, 202, 202, 0.4);
+  background: #fecaca;
+  opacity: 0.7;
 }
 
-/* ── 单档同槽填充：同样 5px 全高实色填充 ── */
-.qw-bar-fill-full {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
-  transition:
-    width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.25s ease;
+/* ── 顶层/单档：5 小时额度 (深色、饱满实色) ── */
+.qw-bar-5h[data-status="normal"] {
+  background: #0284c7;
 }
-html.dark .qw-bar-fill-full {
-  box-shadow: 0 0 5px rgba(56, 189, 248, 0.35);
+html.dark .qw-bar-5h[data-status="normal"] {
+  background: #0ea5e9;
 }
-.qw-bar-fill-full[data-warn="true"] {
-  background: linear-gradient(90deg, #b45309 0%, #f59e0b 100%);
+.qw-bar-5h[data-status="warn"] {
+  background: #d97706;
 }
-html.dark .qw-bar-fill-full[data-warn="true"] {
-  box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
+html.dark .qw-bar-5h[data-status="warn"] {
+  background: #f59e0b;
 }
-.qw-bar-fill-full[data-danger="true"] {
-  background: linear-gradient(90deg, #b91c1c 0%, #ef4444 100%);
+.qw-bar-5h[data-status="danger"] {
+  background: #dc2626;
 }
-html.dark .qw-bar-fill-full[data-danger="true"] {
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.45);
-}
-
-/* 悬浮聚焦时整体进度条呼吸泛光 */
-.qw-card:hover .qw-bar-5h[data-status="normal"],
-.qw-card[data-active="true"] .qw-bar-5h[data-status="normal"] {
-  box-shadow: 0 0 7px rgba(14, 165, 233, 0.55);
-}
-.qw-card:hover .qw-bar-weekly[data-status="normal"],
-.qw-card[data-active="true"] .qw-bar-weekly[data-status="normal"] {
-  box-shadow: 0 0 6px rgba(125, 211, 252, 0.5);
+html.dark .qw-bar-5h[data-status="danger"] {
+  background: #ef4444;
 }
 
 /* ==========================================================================
-   5. 状态点与骨架
+   4. 辅助状态
    ========================================================================== */
 
 .qw-attention {
@@ -362,7 +271,6 @@ html.dark .qw-bar-fill-full[data-danger="true"] {
   flex-shrink: 0;
   border-radius: 50%;
   background: #f7630c;
-  box-shadow: 0 0 4px rgba(247, 99, 12, 0.6);
 }
 
 .qw-note {

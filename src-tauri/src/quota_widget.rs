@@ -43,7 +43,7 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let window =
         WebviewWindowBuilder::new(app, WIDGET_LABEL, WebviewUrl::App("quota-widget.html".into()))
             .title("CC Switch")
-            .inner_size(264.0, 110.0)
+            .inner_size(240.0, 96.0)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)
@@ -386,52 +386,14 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
     use tauri::WebviewWindow;
-    use windows_sys::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_WINDOW_CORNER_PREFERENCE,
-        DWMSBT_TRANSIENTWINDOW, DWMWCP_ROUND,
-    };
-
-    /// DWM 系统背景（Acrylic）有没有套上；套不上（Win10 / 旧 22H2）由网页自绘磨砂。
-    static ACRYLIC: AtomicBool = AtomicBool::new(false);
 
     pub fn glass() -> &'static str {
-        if ACRYLIC.load(Ordering::Acquire) {
-            "acrylic"
-        } else {
-            "frosted"
-        }
+        "frosted"
     }
 
-    pub fn init(window: &WebviewWindow) {
-        let Ok(hwnd) = window.hwnd() else {
-            return;
-        };
-        // SAFETY: hwnd 来自 tao，窗口存活；只在建窗时设置一次背景和圆角。
-        unsafe {
-            // Acrylic 材质的系统背景（飞出层同款），画在网页透明的地方。
-            let backdrop = DWMSBT_TRANSIENTWINDOW;
-            let acrylic = DwmSetWindowAttribute(
-                hwnd.0 as _,
-                DWMWA_SYSTEMBACKDROP_TYPE as u32,
-                &backdrop as *const _ as *const core::ffi::c_void,
-                std::mem::size_of::<i32>() as u32,
-            ) == 0;
-            ACRYLIC.store(acrylic, Ordering::Release);
-            // DWM 圆角跟着裁系统背景，和卡片的 CSS 圆角对齐。
-            let corners = DWMWCP_ROUND;
-            DwmSetWindowAttribute(
-                hwnd.0 as _,
-                DWMWA_WINDOW_CORNER_PREFERENCE as u32,
-                &corners as *const _ as *const core::ffi::c_void,
-                std::mem::size_of::<i32>() as u32,
-            );
-        }
-    }
+    pub fn init(_window: &WebviewWindow) {}
 
-    /// 背景是整窗的，窗口改尺寸时不用动。
     pub fn apply(_window: &WebviewWindow, _width: f64, _height: f64) {}
 }
 
