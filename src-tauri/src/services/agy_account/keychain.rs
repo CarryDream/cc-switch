@@ -2,8 +2,13 @@
 //!
 //! agy 用 zalando/go-keyring 读写它；macOS 上 go-keyring 自己就是调 `/usr/bin/security`，
 //! 条目的访问控制里信任的也是这个程序，所以这里同样经它读写，不会弹授权框（10-21 真机实测）。
-//! 值是 `go-keyring-base64:` 加 base64 的 JSON：
+//! macOS 上的值是 `go-keyring-base64:` 加 base64 的 JSON：
 //! `{token{access_token,token_type,refresh_token,expiry,expires_in},auth_method,id_token}`。
+//! Windows 上 go-keyring 存在「凭据管理器」里：普通凭据，目标名 `gemini:antigravity`，
+//! 用户名 `antigravity`，值是裸 JSON 的 UTF-8 字节，最长 2560 字节（系统上限，go-keyring 也这么拦）。
+//! agy 1.5 起自己写入时不再带 `id_token`，改成 `id_token_email`（可能带 `writer_id`，1.5.2 有、1.5.3 已去掉），
+//! 认账号的办法见 `AgyAccountManager::read_live`。旧格式 agy 1.5 照样能读（切过去的号 agy
+//! 续期后会改写成新格式），这里不转换，原样读写。
 //!
 //! 只做切换要用的两件事：读出整条、整条写入。不删除条目，也不碰 `~/.gemini` 下的文件
 //! （`oauth_creds.json` 那些是 Gemini CLI 的登录，agy 1.4.3 切号只看钥匙串）。
@@ -46,15 +51,60 @@ pub fn decode(raw: &str) -> Result<Value, AppError> {
     Ok(value)
 }
 
-/// 编码成 macOS 上 go-keyring 写入的格式。
+/// 编码成本平台上 go-keyring 写入的格式。
 pub fn encode(credential: &Value) -> Result<String, AppError> {
+    if cfg!(windows) {
+        encode_bare(credential)
+    } else {
+        encode_base64(credential)
+    }
+}
+
+/// macOS 上的格式：`go-keyring-base64:` 加 base64 的 JSON。
+fn encode_base64(credential: &Value) -> Result<String, AppError> {
     let json =
         serde_json::to_string(credential).map_err(|source| AppError::JsonSerialize { source })?;
     Ok(format!("{GO_KEYRING_PREFIX}{}", STANDARD.encode(json)))
 }
 
-/// 本机钥匙串。目前只实现了 macOS；其他平台读写都报不支持。
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+/// Windows 凭据管理器一条凭据的值最长 2560 字节。
+const WINCRED_BLOB_LIMIT: usize = 2560;
+
+/// Windows 上的格式：裸 JSON。超出凭据上限时去掉 `id_token`、改记 `id_token_email`，
+/// 也就是 agy 1.5 起自己写入的样子；认账号靠 refresh token 和邮箱，不靠 id_token。
+fn encode_bare(credential: &Value) -> Result<String, AppError> {
+    let to_json = |value: &Value| {
+        serde_json::to_string(value).map_err(|source| AppError::JsonSerialize { source })
+    };
+    let json = to_json(credential)?;
+    if json.len() <= WINCRED_BLOB_LIMIT {
+        return Ok(json);
+    }
+    let mut slim = credential.clone();
+    if let Some(object) = slim.as_object_mut() {
+        if let Some(id_token) = object.remove("id_token") {
+            let email = id_token
+                .as_str()
+                .and_then(super::oauth::identity)
+                .and_then(|claims| claims.email);
+            if let (Some(email), false) = (email, object.contains_key("id_token_email")) {
+                object.insert("id_token_email".into(), Value::String(email));
+            }
+        }
+    }
+    let json = to_json(&slim)?;
+    if json.len() <= WINCRED_BLOB_LIMIT {
+        return Ok(json);
+    }
+    Err(AppError::localized(
+        "agy.account.credential_too_large",
+        "这个账号的登录数据超过了 Windows 凭据管理器的长度上限，没有切换",
+        "This account's sign-in data exceeds the Windows Credential Manager size limit; agy was not switched.",
+    ))
+}
+
+/// 本机钥匙串：macOS 的钥匙串、Windows 的凭据管理器；其他平台读写都报不支持。
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub struct SystemKeychain {
     service: &'static str,
     account: &'static str,
@@ -70,7 +120,7 @@ impl SystemKeychain {
     }
 
     /// 真机测试用的另一条，别动 agy 那条。
-    #[cfg(all(test, target_os = "macos"))]
+    #[cfg(all(test, any(target_os = "macos", windows)))]
     pub fn named(service: &'static str, account: &'static str) -> Self {
         Self { service, account }
     }
@@ -78,7 +128,7 @@ impl SystemKeychain {
 
 /// Whether the platform can switch the active agy login.
 pub fn supported() -> bool {
-    cfg!(target_os = "macos")
+    cfg!(any(target_os = "macos", windows))
 }
 
 /// Whether the platform can read agy's active login for quota queries.
@@ -86,6 +136,7 @@ pub fn quota_read_supported() -> bool {
     cfg!(any(target_os = "macos", target_os = "windows"))
 }
 
+#[cfg(test)]
 fn decode_credential_blob(blob: &[u8]) -> Result<String, AppError> {
     String::from_utf8(blob.to_vec())
         .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))
@@ -194,74 +245,87 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "windows")]
-mod windows {
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
+#[cfg(windows)]
+mod wincred {
+    use std::ptr;
+
     use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
     use windows_sys::Win32::Security::Credentials::{
-        CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
+        CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
     };
 
     use crate::error::AppError;
 
-    fn to_wide(s: &str) -> Vec<u16> {
-        OsStr::new(s).encode_wide().chain(Some(0)).collect()
+    fn wide(text: &str) -> Vec<u16> {
+        text.encode_utf16().chain(std::iter::once(0)).collect()
     }
 
+    /// go-keyring 的目标名：`service:account`。
     fn target_name(service: &str, account: &str) -> Vec<u16> {
-        to_wide(&format!("{service}:{account}"))
-    }
-
-    const MAX_CREDENTIAL_BLOB_SIZE: usize = 5 * 512;
-
-    struct CredentialGuard(*mut CREDENTIALW);
-
-    impl Drop for CredentialGuard {
-        fn drop(&mut self) {
-            unsafe { CredFree(self.0.cast()) };
-        }
+        wide(&format!("{service}:{account}"))
     }
 
     pub fn read(service: &str, account: &str) -> Result<Option<String>, AppError> {
         let target = target_name(service, account);
-        let mut cred_ptr: *mut CREDENTIALW = std::ptr::null_mut();
-        unsafe {
-            if CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) == 0 {
-                let err = GetLastError();
-                if err == ERROR_NOT_FOUND {
-                    return Ok(None);
-                }
-                return Err(AppError::Config(format!(
-                    "读取 Windows 凭据管理器失败（错误码 {err}）"
-                )));
+        let mut credential: *mut CREDENTIALW = ptr::null_mut();
+        // SAFETY: target 以 0 结尾、在调用期间存活；成功时 credential 指向系统分配的结构，下面用完即 CredFree。
+        let ok = unsafe { CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) };
+        if ok == 0 {
+            // SAFETY: 紧跟在失败的系统调用之后取错误码。
+            let code = unsafe { GetLastError() };
+            if code == ERROR_NOT_FOUND {
+                return Ok(None);
             }
+            return Err(AppError::Config(format!(
+                "读取 Antigravity 登录失败（Windows 错误码 {code}）"
+            )));
         }
-        if cred_ptr.is_null() {
-            return Err(AppError::Config("Windows 凭据管理器返回了空凭据".into()));
-        }
-        let _credential = CredentialGuard(cred_ptr);
-        let cred = unsafe { &*cred_ptr };
-        let blob_size = cred.CredentialBlobSize as usize;
-        if blob_size > MAX_CREDENTIAL_BLOB_SIZE {
-            return Err(AppError::Config(
-                "Windows 凭据管理器返回了超出限制的 Antigravity 登录数据".into(),
-            ));
-        }
-        if blob_size > 0 && cred.CredentialBlob.is_null() {
-            return Err(AppError::Config(
-                "Windows 凭据管理器返回了无效的 Antigravity 登录数据".into(),
-            ));
-        }
-        let blob = if blob_size == 0 {
-            Vec::new()
-        } else {
-            unsafe { std::slice::from_raw_parts(cred.CredentialBlob, blob_size) }.to_vec()
+        // SAFETY: CredReadW 成功，credential 非空；blob 长度由系统给出，复制出来后再释放。
+        let bytes = unsafe {
+            let blob = &*credential;
+            let bytes = if blob.CredentialBlob.is_null() || blob.CredentialBlobSize == 0 {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(blob.CredentialBlob, blob.CredentialBlobSize as usize)
+                    .to_vec()
+            };
+            CredFree(credential as *const core::ffi::c_void);
+            bytes
         };
-        drop(_credential);
-        // go-keyring 在 Windows 上以 UTF-8 字节存入凭据；转换前先释放系统分配的结构。
-        // 空 blob 仍作为已存在的空值返回，由上层识别为无效登录，而不是误报为未登录。
-        super::decode_credential_blob(&blob).map(Some)
+        let value = String::from_utf8(bytes)
+            .map_err(|_| AppError::Config("Antigravity 登录数据不是 UTF-8".into()))?;
+        Ok((!value.is_empty()).then_some(value))
+    }
+
+    /// 和 go-keyring 一样整条覆盖：普通凭据、本机持久、用户名就是 account。
+    pub fn write(service: &str, account: &str, value: &str) -> Result<(), AppError> {
+        let blob = value.as_bytes();
+        if blob.is_empty() || blob.len() > super::WINCRED_BLOB_LIMIT {
+            return Err(AppError::InvalidInput(
+                "Antigravity 登录数据的长度超出 Windows 凭据管理器的上限".into(),
+            ));
+        }
+        let mut target = target_name(service, account);
+        let mut user = wide(account);
+        let credential = CREDENTIALW {
+            Type: CRED_TYPE_GENERIC,
+            TargetName: target.as_mut_ptr(),
+            CredentialBlobSize: blob.len() as u32,
+            CredentialBlob: blob.as_ptr() as *mut u8,
+            Persist: CRED_PERSIST_LOCAL_MACHINE,
+            UserName: user.as_mut_ptr(),
+            ..Default::default()
+        };
+        // SAFETY: 结构里的指针都指向本函数里存活的缓冲区；CredWriteW 只读不写它们。
+        let ok = unsafe { CredWriteW(&credential, 0) };
+        if ok == 0 {
+            // SAFETY: 紧跟在失败的系统调用之后取错误码。
+            let code = unsafe { GetLastError() };
+            return Err(AppError::Config(format!(
+                "写入 Antigravity 登录失败（Windows 错误码 {code}）"
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -271,11 +335,11 @@ impl AgyLoginStore for SystemKeychain {
         {
             macos::read(self.service, self.account)
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         {
-            windows::read(self.service, self.account)
+            wincred::read(self.service, self.account)
         }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         {
             Err(unsupported_error())
         }
@@ -286,12 +350,11 @@ impl AgyLoginStore for SystemKeychain {
         {
             macos::write(self.service, self.account, value)
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         {
-            let _ = value;
-            Err(unsupported_error())
+            wincred::write(self.service, self.account, value)
         }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         {
             let _ = value;
             Err(unsupported_error())
@@ -302,8 +365,8 @@ impl AgyLoginStore for SystemKeychain {
 pub fn unsupported_error() -> AppError {
     AppError::localized(
         "agy.account.unsupported_platform",
-        "切换 Antigravity 账号目前只支持 macOS",
-        "Switching Antigravity accounts is only supported on macOS for now",
+        "切换 Antigravity 账号目前只支持 macOS 和 Windows",
+        "Switching Antigravity accounts is only supported on macOS and Windows for now",
     )
 }
 
@@ -315,9 +378,35 @@ mod tests {
     #[test]
     fn round_trips_the_go_keyring_format() {
         let credential = json!({"token": {"access_token": "a", "refresh_token": "r"}, "auth_method": "consumer", "id_token": "i"});
-        let raw = encode(&credential).unwrap();
+        let raw = encode_base64(&credential).unwrap();
         assert!(raw.starts_with(GO_KEYRING_PREFIX));
         assert_eq!(decode(&raw).unwrap(), credential);
+        let bare = encode_bare(&credential).unwrap();
+        assert!(!bare.starts_with(GO_KEYRING_PREFIX));
+        assert_eq!(decode(&bare).unwrap(), credential);
+    }
+
+    fn fake_id_token(email: &str, padding: usize) -> String {
+        let claims = json!({"sub": "1", "email": email, "pad": "x".repeat(padding)});
+        format!(
+            "h.{}.s",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(claims.to_string())
+        )
+    }
+
+    #[test]
+    fn bare_format_drops_an_oversized_id_token_for_its_email() {
+        let small = json!({"token": {"refresh_token": "r"}, "id_token": fake_id_token("a@example.com", 10)});
+        assert_eq!(decode(&encode_bare(&small).unwrap()).unwrap(), small);
+
+        let big = json!({"token": {"refresh_token": "r"}, "id_token": fake_id_token("a@example.com", 3000)});
+        let slim = decode(&encode_bare(&big).unwrap()).unwrap();
+        assert!(slim.get("id_token").is_none());
+        assert_eq!(slim["id_token_email"], "a@example.com");
+        assert_eq!(slim["token"]["refresh_token"], "r");
+
+        let hopeless = json!({"token": {"refresh_token": "x".repeat(3000)}});
+        assert!(encode_bare(&hopeless).is_err());
     }
 
     #[test]
@@ -340,10 +429,12 @@ mod tests {
 
     #[test]
     fn separates_switching_support_from_quota_read_support() {
-        assert_eq!(supported(), cfg!(target_os = "macos"));
+        // Windows 起也能切换登录（走凭据管理器），两条判定现在一致：
+        // 能读就能切，macOS 与 Windows 之外都不支持。
+        assert_eq!(supported(), cfg!(any(target_os = "macos", windows)));
         assert_eq!(
             quota_read_supported(),
-            cfg!(any(target_os = "macos", target_os = "windows"))
+            cfg!(any(target_os = "macos", windows))
         );
     }
 }
