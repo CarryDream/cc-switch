@@ -102,7 +102,20 @@ export function isKnownAppId(appType: string): appType is AppId {
   return appType in APP_DISPLAY_NAME;
 }
 
+/**
+ * 只导入了用量、还没做成应用（没有 `AppId`）的客户端。用量页认得它们，
+ * 但没有图标、没有供应商卡片，名字单独给。
+ */
+export const USAGE_ONLY_APP_NAMES: Record<
+  string,
+  { name: string; short: string }
+> = {
+  droid: { name: "Factory Droid", short: "Droid" },
+};
+
 export function appDisplayName(appType: string): string {
+  const usageOnly = USAGE_ONLY_APP_NAMES[appType];
+  if (usageOnly) return usageOnly.name;
   return isKnownAppId(appType) ? APP_DISPLAY_NAME[appType] : appType;
 }
 
@@ -129,7 +142,14 @@ const APP_SHORT_NAME: Record<AppId, string> = {
   workbuddy: "WorkBuddy",
 };
 
+/** 没有品牌图标的应用在筛选条里显示的两位字母标记。 */
+export function usageOnlyMonogram(appType: string): string {
+  return (USAGE_ONLY_APP_NAMES[appType]?.short ?? appType).slice(0, 2);
+}
+
 export function appShortName(appType: string): string {
+  const usageOnly = USAGE_ONLY_APP_NAMES[appType];
+  if (usageOnly) return usageOnly.short;
   return isKnownAppId(appType) ? APP_SHORT_NAME[appType] : appType;
 }
 

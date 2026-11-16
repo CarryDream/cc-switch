@@ -195,6 +195,11 @@ pub fn sync_all_unlocked(db: &Database) -> SessionSyncResult {
         "WorkBuddy",
         crate::services::session_usage_workbuddy::sync_workbuddy_usage(db),
     );
+    merge_sync_step(
+        &mut result,
+        "Factory Droid",
+        crate::services::session_usage_droid::sync_droid_usage(db),
+    );
     // Web 与 Desktop 共用 `$DSH_HOME/sessions`，一次扫描覆盖两端
     merge_sync_step(
         &mut result,

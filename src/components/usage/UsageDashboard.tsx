@@ -14,7 +14,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { AppPageHeader } from "@/components/shell/AppPageHeader";
-import { AppGlyph, APP_DISPLAY_NAME } from "@/components/shell/AppGlyph";
+import { AppGlyph } from "@/components/shell/AppGlyph";
 import { HelpTip } from "@/components/ui/help-tip";
 import { PageTabs } from "@/components/ui/page-tabs";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,12 @@ import { getUsageRangePresetLabel, resolveUsageRange } from "@/lib/usageRange";
 import { cn } from "@/lib/utils";
 import { UsageHero } from "./UsageHero";
 import { UsageTrendChart } from "./UsageTrendChart";
-import { RequestLogTable } from "./RequestLogTable";
+import {
+  appDisplayName,
+  isKnownAppId,
+  RequestLogTable,
+  usageOnlyMonogram,
+} from "./RequestLogTable";
 import { ProviderStatsTable } from "./ProviderStatsTable";
 import { ModelStatsTable } from "./ModelStatsTable";
 import { PricingConfigPanel } from "./PricingConfigPanel";
@@ -567,6 +572,8 @@ export function UsageDashboard({
     const visible = { ...DEFAULT_VISIBLE_APPS, ...settings?.visibleApps };
     return KNOWN_APP_TYPES.filter(
       (app) =>
+        // 只导入用量的应用（droid）在「应用」页没有开关，永远列出来
+        !isKnownAppId(app) ||
         visible[app] ||
         (app === "claude" && visible["claude-desktop"]) ||
         app === appType,
@@ -614,24 +621,34 @@ export function UsageDashboard({
         >
           {t("usage.appFilter.all")}
         </button>
-        {/* 应用只露图标，名字放悬停提示和 aria-label */}
+        {/* 应用只露图标，名字放悬停提示和 aria-label；只导入用量的应用没有品牌图标，
+            用两位字母标记顶上（`droid` 之类，见 `USAGE_ONLY_APP_NAMES`） */}
         {filterApps.map((app) => (
-          <HoverTip key={app} content={APP_DISPLAY_NAME[app]}>
+          <HoverTip key={app} content={appDisplayName(app)}>
             <button
               type="button"
               aria-pressed={appType === app}
-              aria-label={APP_DISPLAY_NAME[app]}
+              aria-label={appDisplayName(app)}
               className={cn(
                 chipClass(appType === app),
                 "w-[30px] justify-center px-0",
               )}
               onClick={() => changeAppType(app)}
             >
-              <AppGlyph
-                app={app}
-                size={16}
-                badgeClassName={appType === app ? "bg-subtle" : "bg-surface"}
-              />
+              {isKnownAppId(app) ? (
+                <AppGlyph
+                  app={app}
+                  size={16}
+                  badgeClassName={appType === app ? "bg-subtle" : "bg-surface"}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="text-[10px] font-semibold leading-none tracking-tight"
+                >
+                  {usageOnlyMonogram(app)}
+                </span>
+              )}
             </button>
           </HoverTip>
         ))}

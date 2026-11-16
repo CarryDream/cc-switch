@@ -23,6 +23,12 @@ describe("getUsageProviderLabel", () => {
     expect(getUsageProviderLabel("Oh My Pi (Session)", t).label).toBe(
       "usage.sessionProvider.label:Oh My Pi",
     );
+    // 只导入用量、还没做成应用的客户端（没有 AppId）也走同一条翻译
+    expect(getUsageProviderLabel("Factory Droid (Session)", t)).toEqual({
+      label: "usage.sessionProvider.label:Factory Droid",
+      shortLabel: "usage.sessionProvider.short",
+      hint: "usage.sessionProvider.hint",
+    });
   });
 
   it("translates every placeholder name the backend can return", () => {

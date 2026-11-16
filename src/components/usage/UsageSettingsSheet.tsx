@@ -21,10 +21,10 @@ import {
 } from "@/components/ui/select";
 import type { UsageDisplaySettings } from "@/types";
 import { useGlobalProxyConfig } from "@/lib/query/proxy";
-import { APP_DISPLAY_NAME } from "@/components/shell/AppGlyph";
 import { KNOWN_APP_TYPES } from "@/types/usage";
 import { cn } from "@/lib/utils";
 import { getResolvedLang, joinNames } from "./format";
+import { appDisplayName } from "./RequestLogTable";
 import { UsageDisplaySection } from "./UsageDisplaySection";
 import { settingsCardClass, settingsGroupTitleClass } from "./settingsStyles";
 
@@ -158,7 +158,7 @@ export function UsageSettingsSheet({
 }: UsageSettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const coveredApps = joinNames(
-    KNOWN_APP_TYPES.map((app) => APP_DISPLAY_NAME[app]),
+    KNOWN_APP_TYPES.map((app) => appDisplayName(app)),
     getResolvedLang(i18n),
   );
   const cadence = sessionAutoSyncEnabled

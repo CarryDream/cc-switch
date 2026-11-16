@@ -31,6 +31,14 @@ const SESSION_ACCOUNT_PROVIDER_APPS: Record<string, AppId> = {
   "DeepSeek Harness (OAuth)": "dsh",
 };
 
+/**
+ * 只导入了用量、还没做成应用（没有 AppId）的客户端：直接给全名，不走
+ * 「应用名」那条翻译。Factory Droid（`~/.factory/sessions`）只导入用量。
+ */
+const SESSION_ONLY_PROVIDER_APPS: Record<string, string> = {
+  "Factory Droid (Session)": "Factory Droid",
+};
+
 export interface UsageProviderLabel {
   label: string;
   /** 旁边已经有「应用」列时用的短名：会话日志占位名省掉应用名，其余同 label */
@@ -59,7 +67,17 @@ export function getUsageProviderLabel(
     };
   }
   const app = SESSION_PROVIDER_APPS[name];
-  if (!app) return { label: name, shortLabel: name };
+  if (!app) {
+    const sessionOnly = SESSION_ONLY_PROVIDER_APPS[name];
+    if (sessionOnly) {
+      return {
+        label: t("usage.sessionProvider.label", { app: sessionOnly }),
+        shortLabel: t("usage.sessionProvider.short"),
+        hint: t("usage.sessionProvider.hint"),
+      };
+    }
+    return { label: name, shortLabel: name };
+  }
   return {
     label: t("usage.sessionProvider.label", { app: APP_DISPLAY_NAME[app] }),
     shortLabel: t("usage.sessionProvider.short"),
