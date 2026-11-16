@@ -29,7 +29,41 @@ struct AgySyncCursorUpdate<'a> {
 }
 
 pub fn sync_agy_usage(db: &Database) -> Result<SessionSyncResult, AppError> {
+    heal_native_alias_models(db)?;
     sync_agy_usage_from_files(db, agy::transcript_files())
+}
+
+/// 老导入把 agy 的内部别名当成了模型名（planner 的 `gemini-pro-orchestrator-g1-pro`、
+/// Orchestrator 用的 flash worker `gemini-flash-worker-agy`）：显示得莫名其妙，定价表里
+/// 也没有，费用一律记 0。这里一次性改成它实际用的模型，再让既有的缺价回填重算成本。
+///
+/// 只改 `app_type='agy'` 的明细；已汇总（明细被剪掉）的历史不动 —— 那些行不会再重新导入。
+fn heal_native_alias_models(db: &Database) -> Result<u64, AppError> {
+    let mut changed = 0u64;
+    {
+        let conn = lock_conn!(db.conn);
+        for (alias, real) in NATIVE_ALIASES
+            .iter()
+            .copied()
+            .chain([("gemini-flash-worker-agy", "gemini-4-hydrogen")])
+        {
+            changed += conn.execute(
+                "UPDATE proxy_request_logs SET model = ?1 WHERE app_type = 'agy' AND model = ?2",
+                params![real, alias],
+            )? as u64;
+        }
+        if changed > 0 {
+            log::info!(
+                "[agy] 把 {changed} 条内部别名（planner / flash worker）纠正为实际模型，重算成本"
+            );
+        }
+    }
+    if changed > 0 {
+        if let Err(error) = db.backfill_missing_usage_costs() {
+            log::warn!("[agy] 别名纠正后重算成本失败: {error}");
+        }
+    }
+    Ok(changed)
 }
 
 fn sync_agy_usage_from_files(
@@ -129,9 +163,39 @@ fn model_id_of(display: &str) -> String {
         .join("-")
 }
 
+/// agy 的内部别名：转录里 `model` 字段与原生库字段 19 都会写这些名字，它们不是模型 ID，
+/// 定价表里也没有，直接入库会显示得莫名其妙、费用还记 0。这里换成它实际用的模型。
+///
+/// 实测（本机 Orchestrator 会话 `65ab026b` 的原生库：字段 19 / 字段 21）：
+///
+/// | 字段 19（别名） | 字段 21（协议名） | 实际模型 |
+/// | --- | --- | --- |
+/// | `gemini-4-hydrogen` | `Gemini 4 Hydrogen (High)` | 保持不变 |
+/// | `gemini-pro-orchestrator-g1-pro` | `Orchestrator (Argon)` | `gemini-4-argon` |
+/// | `gemini-flash-worker-agy` | `Gemini 4 Hydrogen (Orchestrator)` | 原生库可读时 `gemini-4-hydrogen-orchestrator`，只有别名时 `gemini-4-hydrogen` |
+const NATIVE_ALIASES: [(&str, &str); 3] = [
+    ("gemini-pro-orchestrator", "gemini-4-carbon"),
+    ("gemini-pro-orchestrator-argon", "gemini-4-argon"),
+    ("gemini-pro-orchestrator-g1-pro", "gemini-4-argon"),
+];
+
+/// 内部别名 → 实际模型。接受显示名（`Orchestrator (Argon)`）也接受 ID。
+pub(super) fn native_alias(model: &str) -> Option<&'static str> {
+    let id = model_id_of(model);
+    if let Some((_, real)) = NATIVE_ALIASES.iter().find(|(alias, _)| *alias == id) {
+        return Some(real);
+    }
+    matches!(id.as_str(), "gemini-flash-worker-agy" | "gemini-flash-worker").then_some("gemini-4-hydrogen")
+}
+
+/// 这个值是不是「不是模型的内部别名」——这种值不能当成最终模型。
+pub(super) fn is_native_alias(model: &str) -> bool {
+    native_alias(model).is_some()
+}
+
 /// Multi-model modes, not evidence of the model used for an individual response.
 /// Display name and native alias of the same mode map to the same planner.
-fn orchestrator_mode(model: &str) -> Option<&'static str> {
+pub(super) fn orchestrator_mode(model: &str) -> Option<&'static str> {
     match model_id_of(model).as_str() {
         "orchestrator-carbon" | "gemini-pro-orchestrator" => Some("carbon"),
         "orchestrator-argon" | "gemini-pro-orchestrator-argon" => Some("argon"),
@@ -236,7 +300,9 @@ fn import_records_with_cursor(
                 let selected =
                     known_model(row).or_else(|| model_by_step.get(&step).map(String::as_str));
                 // Pruned steps can never be updated again, so their model is moot.
-                let needs_model = selected.is_none_or(is_orchestrator) && !pruned.contains(&step);
+                let needs_model = selected
+                    .is_none_or(|model| is_orchestrator(model) || is_native_alias(model))
+                    && !pruned.contains(&step);
                 (needs_model || !settled.contains(&step)).then_some(step)
             })
             .collect();
@@ -295,7 +361,7 @@ fn import_records_with_cursor(
             .or_else(|| model_by_step.get(&step).cloned())
             .or_else(|| native_model_by_step.get(&step).cloned())
             .unwrap_or_else(|| "unknown".to_string());
-        let actual = if is_orchestrator(&display) {
+        let actual = if is_orchestrator(&display) || is_native_alias(&display) {
             native_model_by_step.get(&step).unwrap_or(&display)
         } else {
             &display
@@ -322,6 +388,9 @@ fn import_records_with_cursor(
         } else {
             (model, display)
         };
+        // 原生库读不到、也没有已恢复的名字时只能拿到别名：换成它实际用的模型，
+        // 至少能查到价格、显示也说得通。
+        let model = native_alias(&model).map_or(model, str::to_string);
         let [input_cost, output_cost, cache_cost, write_cost, total_cost] = costs(
             &tx,
             &mut pricing_cache,
@@ -424,6 +493,32 @@ fn known_model(row: &Value) -> Option<&str> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// 用真实 Antigravity 数据核对模型识别：
+    /// `cargo test --lib real_agy_home -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn real_agy_home_models_are_never_native_aliases() {
+        let db = Database::memory().unwrap();
+        let result = sync_agy_usage_from_files(&db, agy::transcript_files()).unwrap();
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let conn = db.conn.lock().unwrap();
+        let rows: Vec<(String, i64, f64)> = conn
+            .prepare(
+                "SELECT model, COUNT(*), COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0.0)
+                 FROM proxy_request_logs WHERE app_type='agy' GROUP BY model ORDER BY 2 DESC",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        for (model, count, cost) in &rows {
+            eprintln!("{model:44} rows={count:4} cost={cost:.4}");
+            assert!(!is_native_alias(model), "内部别名入库了: {model}");
+        }
+        assert!(!rows.is_empty());
+    }
 
     #[test]
     fn native_models_backfill_unknown_rows_without_changing_tokens_or_deduplication() {

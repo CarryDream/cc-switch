@@ -86,6 +86,103 @@ fn hydrogen_orchestrator_native_display_is_priced_without_losing_provenance() {
     );
 }
 
+/// 实测的本机 Orchestrator 会话：字段 19 是内部别名，真正的模型要从字段 21 的档位推。
+#[test]
+fn native_aliases_resolve_to_the_model_that_actually_served_the_step() {
+    if crate::config::sqlite_unsupported_in_temp_dir() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("conversations")).unwrap();
+    let source = dir
+        .path()
+        .join("brain/session/.system_generated/logs/transcript_full.jsonl");
+    let mode = "Orchestrator (Argon)";
+    let db = Database::memory().unwrap();
+    // 转录里的 model 就是别名（本机 65ab026b 会话就是这样写的）
+    let rows = vec![
+        json!({"step_index":0,"type":"USER_INPUT","content":format!("changed setting `Model Selection` from None to {mode}. No need to comment")}),
+        json!({"step_index":1,"type":"PLANNER_RESPONSE","status":"DONE","model":"gemini-pro-orchestrator-g1-pro","input_tokens":1_000_000,"output_tokens":100_000}),
+        json!({"step_index":3,"type":"PLANNER_RESPONSE","status":"DONE","model":"gemini-flash-worker-agy","input_tokens":1_000_000,"output_tokens":100_000}),
+    ];
+    // 没有原生库时只能靠别名表：planner → Argon，flash worker → Hydrogen 本体
+    import_records(&db, "session", &rows, Some(&source)).unwrap();
+    assert_eq!(detail(&db, 1).0, "gemini-4-argon");
+    assert_eq!(detail(&db, 3).0, "gemini-4-hydrogen");
+
+    // 原生库可读时按字段 21 的档位得到同样的答案
+    native_models::write_test_database(
+        &dir.path().join("conversations/session.db"),
+        &[(1, 0, "gemini-pro-orchestrator-g1-pro"), (3, 7, "gemini-flash-worker-agy")],
+    );
+    let native = rusqlite::Connection::open(dir.path().join("conversations/session.db")).unwrap();
+    native_models::set_test_generation(
+        &native,
+        0,
+        "gemini-pro-orchestrator-g1-pro",
+        &native_models::test_model_id("Orchestrator (Argon)"),
+    );
+    native_models::set_test_generation(
+        &native,
+        7,
+        "gemini-flash-worker-agy",
+        &native_models::test_model_id("Gemini 4 Hydrogen (Orchestrator)"),
+    );
+    db.conn.lock().unwrap().execute("DELETE FROM proxy_request_logs", []).unwrap();
+    db.conn.lock().unwrap().execute("DELETE FROM session_usage_dedup", []).unwrap();
+    import_records(&db, "session", &rows, Some(&source)).unwrap();
+    assert_eq!(detail(&db, 1).0, "gemini-4-argon");
+    assert_eq!(detail(&db, 3).0, "gemini-4-hydrogen-orchestrator");
+    // 两个都不是免费模型：别名查不到价才会是 "0"
+    assert!(detail(&db, 1).2.parse::<f64>().unwrap() > 0.0);
+    assert!(detail(&db, 3).2.parse::<f64>().unwrap() > 0.0);
+}
+
+#[test]
+fn legacy_alias_rows_are_renamed_to_the_real_model() {
+    let db = Database::memory().unwrap();
+    {
+        let conn = db.conn.lock().unwrap();
+        for (id, model) in [
+            ("agy:s:1", "gemini-flash-worker-agy"),
+            ("agy:s:2", "gemini-pro-orchestrator-g1-pro"),
+            ("agy:s:3", "gemini-3.8-flash-high"),
+        ] {
+            conn.execute(
+                "INSERT INTO proxy_request_logs (request_id,provider_id,app_type,model,request_model,
+                    input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,input_cost_usd,
+                    output_cost_usd,cache_read_cost_usd,cache_creation_cost_usd,total_cost_usd,
+                    latency_ms,status_code,created_at,data_source)
+                 VALUES (?1,'_agy_session','agy',?2,?2,1000,100,0,0,'0','0','0','0','0',0,200,1,'agy_session')",
+                rusqlite::params![id, model],
+            )
+            .unwrap();
+        }
+    }
+    assert_eq!(heal_native_alias_models(&db).unwrap(), 2);
+    let conn = db.conn.lock().unwrap();
+    let models: Vec<String> = conn
+        .prepare("SELECT model FROM proxy_request_logs ORDER BY request_id")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(
+        models,
+        ["gemini-4-hydrogen", "gemini-4-argon", "gemini-3.8-flash-high"]
+    );
+    // 别名没价格 → 纠正后按实际模型重算（flash 档按 token 有价格）
+    let cost: String = conn
+        .query_row(
+            "SELECT total_cost_usd FROM proxy_request_logs WHERE request_id='agy:s:1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(cost.parse::<f64>().unwrap() > 0.0, "成本没重算: {cost}");
+}
+
 #[test]
 fn orchestrator_splits_native_generations_and_preserves_request_mode() {
     if crate::config::sqlite_unsupported_in_temp_dir() {

@@ -208,22 +208,25 @@ fn read_generations(path: &Path, steps: &[u64]) -> rusqlite::Result<HashMap<u64,
             .map(|response| response.model);
         // Orchestrator's display field names the mode (or just "Gemini Flash"),
         // while field 19 identifies the planner/worker that produced this step.
-        // Only these exact AGY aliases are mapped; unknown IDs keep their configured pricing.
+        // Aliases are mapped through the shared table in `session_usage_agy`; unknown IDs
+        // keep their configured pricing.
         // https://antigravity.google/docs/models#orchestrator
-        let orchestrator_model = match base.as_deref() {
-            Some("gemini-pro-orchestrator") => Some("gemini-4-carbon"),
-            Some("gemini-pro-orchestrator-argon") => Some("gemini-4-argon"),
-            Some("gemini-flash-worker-agy") => Some("gemini-4-hydrogen"),
-            _ => None,
-        };
-        let tiered = tiered.filter(|model| {
-            let id = super::model_id_of(model);
-            // Keep a concrete field-21 model/tier if a newer AGY build supplies one.
-            !(orchestrator_model.is_some()
-                && (super::is_orchestrator(&id)
-                    || matches!(id.as_str(), "gemini-flash" | "gemini-flash-worker-agy")))
+        let tiered_id = tiered.as_deref().map(super::model_id_of);
+        // Field 21 only wins when it names a concrete model or tier. `Orchestrator (Argon)`
+        // is the mode, not a model: it picks the planner, and aliases are not models either.
+        let tiered = tiered.as_deref().filter(|_| {
+            let id = tiered_id.as_deref().unwrap_or_default();
+            !(super::is_orchestrator(id)
+                || super::is_native_alias(id)
+                || matches!(id, "gemini-flash" | "gemini-flash-worker-agy"))
         });
-        let model = [tiered, orchestrator_model.map(str::to_string), base]
+        // The planner of Orchestrator is selected by mode: Carbon / Argon.
+        let orchestrator_model = tiered_id
+            .as_deref()
+            .and_then(super::orchestrator_mode)
+            .map(|mode| format!("gemini-4-{mode}"))
+            .or_else(|| base.as_deref().and_then(super::native_alias).map(str::to_string));
+        let model = [tiered.map(str::to_string), orchestrator_model, base]
             .into_iter()
             .flatten()
             .map(|model| model.trim().to_string())

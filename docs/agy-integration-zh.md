@@ -76,6 +76,23 @@ Token 用量只导入完成的模型响应。实测使用本地模拟 Gemini SSE
 
 用量模型优先取 JSONL 响应中的模型字段或该步骤之前的 `Model Selection` 事件。两者均缺失时（例如子代理会话），从同一 CLI、IDE 或私有目录下的 `conversations/<id>.db` 只读查询：通过 `steps.metadata` 的生成记录编号，读取对应 `gen_metadata` 中的模型名称：优先取带档位的完整 ID（如 `gemini-4-argon-high`，与 `Model Selection` 得到的 ID 一致，计价时剥掉档位；旧版若记的是显示名也按同样规则转换），没有时回退到基础模型名（如 `gemini-3.8-flash-n`）。Protobuf 仅解析关联和模型字段，不通过对话正文或 `flash`、`pro` 档位猜测模型。数据库忙或不可读时继续导入 Token，保留已经恢复的模型名称；后续同步可补全仍保留的 `unknown` 明细。
 
+### 内部别名不是模型
+
+agy 在转录的 `model` 字段和原生库字段 19 里会直接写**内部别名**，它们不是模型 ID、定价表里也没有，原样入库既显示得莫名其妙、费用还一律记 0。本机 Orchestrator 会话（`65ab026b`）的原生库里，字段 19 / 字段 21 的实测对应关系：
+
+| 字段 19（别名） | 字段 21（协议名） | 实际模型 |
+| --- | --- | --- |
+| `gemini-4-hydrogen` | `Gemini 4 Hydrogen (High)` | 原样保留 |
+| `gemini-pro-orchestrator-g1-pro` | `Orchestrator (Argon)` | `gemini-4-argon` |
+| `gemini-flash-worker-agy` | `Gemini 4 Hydrogen (Orchestrator)` | `gemini-4-hydrogen-orchestrator`（字段 21 只是 `Gemini Flash` 这类泛称时为 `gemini-4-hydrogen`） |
+
+处理方式：
+
+- 转录里读到别名时**不算定论**，仍然去原生库按字段 21 的档位取真实模型（别名丢了档位）。
+- 原生库读不到时按别名表退到实际模型（planner 按字段 21 的档位定 Carbon / Argon；flash worker 退到 Hydrogen 本体）。
+- 已经按别名导入过的明细，同步开头会一次性改名并重算成本；定价层也认得别名（含已被汇总的历史）作为兜底。
+- 目前见过的只有 Orchestrator 相关的三个别名，新写法请补 `session_usage_agy::NATIVE_ALIASES` 与 `usage_stats::agy_native_alias` 两处。
+
 无法确定的模型仍记为 `unknown`。费用沿用现有模型价格表估算，不代表实际账单；查不到价格时为 0；只有基础模型名时，`-n`、`-tiered` 等原生后缀也沿用同一价格匹配规则，不按后缀推定价格。用量导入不从当前供应商反推历史模型，也不更改原生登录、订阅额度或计费。
 
 ## 验证

@@ -2792,6 +2792,11 @@ fn model_pricing_candidates(model_id: &str) -> Vec<String> {
         if candidate == "gemini-4-hydrogen-orchestrator" {
             queue.push("gemini-4-hydrogen".to_string());
         }
+        // agy 的内部别名（planner / Orchestrator 的 flash worker）不是模型 ID，定价表里没有。
+        // 老导入可能已经把别名写进了库，这里按它实际用的模型兜底计价。
+        if let Some(real) = agy_native_alias(&candidate) {
+            queue.push(real.to_string());
+        }
         if candidate.starts_with("claude-") && candidate.contains('.') {
             queue.push(candidate.replace('.', "-"));
         }
@@ -2948,6 +2953,17 @@ fn strip_reasoning_effort_suffix(model_id: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// agy 内部别名 → 实际模型。与 `services::session_usage_agy::native_alias` 同一张表；
+/// 这里是为了让已经写进库的历史行（含被汇总过的）也能查到价格。
+fn agy_native_alias(model_id: &str) -> Option<&'static str> {
+    match model_id {
+        "gemini-pro-orchestrator" => Some("gemini-4-carbon"),
+        "gemini-pro-orchestrator-argon" | "gemini-pro-orchestrator-g1-pro" => Some("gemini-4-argon"),
+        "gemini-flash-worker-agy" | "gemini-flash-worker" => Some("gemini-4-hydrogen"),
+        _ => None,
+    }
 }
 
 fn should_try_pricing_prefix_match(model_id: &str) -> bool {
@@ -6131,6 +6147,18 @@ mod tests {
         ] {
             assert!(find_model_pricing_row(&conn, model)?.is_none(), "{model}");
         }
+        // agy 的内部别名不是模型：老导入可能已经把别名写进库，按它实际用的模型兜底计价。
+        let carbon = find_model_pricing_row(&conn, "gemini-4-carbon")?;
+        let argon = find_model_pricing_row(&conn, "gemini-4-argon")?;
+        assert!(carbon.is_some() && argon.is_some());
+        assert_eq!(
+            find_model_pricing_row(&conn, "gemini-pro-orchestrator")?,
+            carbon
+        );
+        for model in ["gemini-pro-orchestrator-argon", "gemini-pro-orchestrator-g1-pro"] {
+            assert_eq!(find_model_pricing_row(&conn, model)?, argon, "{model}");
+        }
+        assert_eq!(find_model_pricing_row(&conn, "gemini-flash-worker-agy")?, base);
 
         conn.execute(
             "INSERT INTO model_pricing VALUES ('gemini-4-hydrogen-orchestrator',
