@@ -11,8 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useRequestLogs } from "@/lib/query/usage";
 import { TablePagination } from "./TablePagination";
 import { HelpTip } from "@/components/ui/help-tip";
-import { AppGlyph, APP_DISPLAY_NAME } from "@/components/shell/AppGlyph";
-import type { AppId } from "@/lib/api";
+import { AppGlyph } from "@/components/shell/AppGlyph";
 import {
   CACHE_INCLUSIVE_APP_TYPES,
   getFreshInputTokens,
@@ -98,60 +97,14 @@ export function formatLogFullTime(createdAt: number): string {
   )}`;
 }
 
-export function isKnownAppId(appType: string): appType is AppId {
-  return appType in APP_DISPLAY_NAME;
-}
-
-/**
- * 只导入了用量、还没做成应用（没有 `AppId`）的客户端。用量页认得它们，
- * 但没有图标、没有供应商卡片，名字单独给。
- */
-export const USAGE_ONLY_APP_NAMES: Record<
-  string,
-  { name: string; short: string }
-> = {
-  droid: { name: "Factory Droid", short: "Droid" },
-};
-
-export function appDisplayName(appType: string): string {
-  const usageOnly = USAGE_ONLY_APP_NAMES[appType];
-  if (usageOnly) return usageOnly.name;
-  return isKnownAppId(appType) ? APP_DISPLAY_NAME[appType] : appType;
-}
-
-/**
- * 请求日志「应用」列用的短名：图标已经区分了品牌（Claude Code / Desktop 靠角标），
- * 列里只留最短能认出的名字，把宽度让给供应商列。全名在悬停提示里。
- */
-const APP_SHORT_NAME: Record<AppId, string> = {
-  claude: "Claude",
-  "claude-desktop": "Desktop",
-  codex: "Codex",
-  gemini: "Gemini",
-  grokbuild: "Grok",
-  opencode: "OpenCode",
-  openclaw: "OpenClaw",
-  hermes: "Hermes",
-  pi: "Pi",
-  mcode: "MiniMax",
-  kimi: "Kimi",
-  dsh: "DSH",
-  agy: "Antigravity",
-  omp: "omp",
-  copilot: "Copilot",
-  workbuddy: "WorkBuddy",
-};
-
-/** 没有品牌图标的应用在筛选条里显示的两位字母标记。 */
-export function usageOnlyMonogram(appType: string): string {
-  return (USAGE_ONLY_APP_NAMES[appType]?.short ?? appType).slice(0, 2);
-}
-
-export function appShortName(appType: string): string {
-  const usageOnly = USAGE_ONLY_APP_NAMES[appType];
-  if (usageOnly) return usageOnly.short;
-  return isKnownAppId(appType) ? APP_SHORT_NAME[appType] : appType;
-}
+export {
+  appDisplayName,
+  appShortName,
+  isKnownAppId,
+  USAGE_ONLY_APP_NAMES,
+  usageOnlyMonogram,
+} from "./appLabels";
+import { appDisplayName, appShortName, isKnownAppId } from "./appLabels";
 
 const isSuccessStatus = (code: number) => code >= 200 && code < 300;
 

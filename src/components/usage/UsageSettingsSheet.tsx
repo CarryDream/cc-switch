@@ -24,7 +24,7 @@ import { useGlobalProxyConfig } from "@/lib/query/proxy";
 import { KNOWN_APP_TYPES } from "@/types/usage";
 import { cn } from "@/lib/utils";
 import { getResolvedLang, joinNames } from "./format";
-import { appDisplayName } from "./RequestLogTable";
+import { appDisplayName } from "./appLabels";
 import { UsageDisplaySection } from "./UsageDisplaySection";
 import { settingsCardClass, settingsGroupTitleClass } from "./settingsStyles";
 

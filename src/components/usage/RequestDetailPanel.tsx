@@ -28,7 +28,7 @@ import {
   getResolvedLang,
   parseFiniteNumber,
 } from "./format";
-import { appDisplayName } from "./RequestLogTable";
+import { appDisplayName } from "./appLabels";
 import { getUsageProviderLabel } from "./providerLabel";
 
 interface RequestDetailPanelProps {

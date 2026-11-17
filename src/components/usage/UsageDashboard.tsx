@@ -57,12 +57,12 @@ import { getUsageRangePresetLabel, resolveUsageRange } from "@/lib/usageRange";
 import { cn } from "@/lib/utils";
 import { UsageHero } from "./UsageHero";
 import { UsageTrendChart } from "./UsageTrendChart";
+import { RequestLogTable } from "./RequestLogTable";
 import {
   appDisplayName,
   isKnownAppId,
-  RequestLogTable,
   usageOnlyMonogram,
-} from "./RequestLogTable";
+} from "./appLabels";
 import { ProviderStatsTable } from "./ProviderStatsTable";
 import { ModelStatsTable } from "./ModelStatsTable";
 import { PricingConfigPanel } from "./PricingConfigPanel";
