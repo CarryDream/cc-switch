@@ -23,10 +23,13 @@ vi.mock("@/components/AgyAccountQuotaFooter", () => ({
     <span data-testid="agy-account-quota">{accountId}</span>
   ),
 }));
-const platform = vi.hoisted(() => ({ mac: true }));
+// `canSwitchAgyAccount()` 是「macOS 或 Windows」，而 `isWindows()` 读的是宿主 UA：
+// 只翻 mac 的话，在 Windows 上跑测试仍然是「能切号」。两个都 mock 才与宿主机无关。
+const platform = vi.hoisted(() => ({ mac: true, windows: false }));
 vi.mock("@/lib/platform", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/platform")>()),
   isMac: () => platform.mac,
+  isWindows: () => platform.windows,
 }));
 vi.mock("@/lib/query/failover", () => ({
   useProviderHealth: () => ({ data: undefined }),
@@ -140,6 +143,7 @@ describe("ProviderCard Antigravity official quota", () => {
 
   it("ignores the binding where accounts cannot be switched", () => {
     platform.mac = false;
+    platform.windows = false;
     renderCard(bound);
     expect(screen.getByTestId("subscription-quota")).toHaveTextContent("agy");
     expect(screen.queryByTestId("agy-account-quota")).not.toBeInTheDocument();

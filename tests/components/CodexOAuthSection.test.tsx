@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexOAuthSection } from "@/components/providers/forms/CodexOAuthSection";
 import { AuthCenterPanel } from "@/components/settings/AuthCenterPanel";
+import { renderWithQueryClient } from "../utils/testQueryClient";
 
 const mocks = vi.hoisted(() => ({
   useCodexOauth: vi.fn(),
@@ -135,7 +136,9 @@ describe("CodexOAuthSection", () => {
   });
 
   it("renders account quota in Auth Center", () => {
-    render(<AuthCenterPanel />);
+    // Windows 上 AuthCenterPanel 会渲染 AgyOAuthSection（它用 react-query），
+    // 所以这个用例要带 QueryClientProvider，否则在 Windows 开发机上必挂。
+    renderWithQueryClient(<AuthCenterPanel />);
 
     expect(mocks.renderAccountQuota).toHaveBeenCalledWith("account-1");
     expect(mocks.renderAccountQuota).toHaveBeenCalledWith("account-2");
