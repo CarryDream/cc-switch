@@ -423,6 +423,8 @@ export function QuotaWidget() {
   const dark = useWidgetTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TrayPanelState | null>(null);
+  // 文案不来自 `tray_panel_state`（后端 `PanelModel` 没有这个字段），随 `ready` 下发
+  const [texts, setTexts] = useState<PanelTexts | null>(null);
   const [agyTiers, setAgyTiers] = useState<AgyQuotaTier[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isHovered, setIsHovered] = useState(false);
@@ -468,6 +470,7 @@ export function QuotaWidget() {
         if (cancelled) return;
         document.documentElement.dataset.glass = info.glass;
         document.documentElement.dataset.platform = info.platform;
+        setTexts(info.texts);
       })
       .catch(() => {});
     return () => {
@@ -508,7 +511,8 @@ export function QuotaWidget() {
   useEffect(() => {
     let alive = true;
     const load = async () => {
-      await quotaWidgetApi.refresh();
+      // 刷新只是把缓存焐热：失败也要照常展示已有缓存，不能因此整块空白。
+      await quotaWidgetApi.refresh().catch(() => {});
       const next = await quotaWidgetApi.state();
       if (alive) setState(next);
     };
@@ -582,7 +586,6 @@ export function QuotaWidget() {
     };
   }, []);
 
-  const texts = state?.texts;
   const quotaTargets = collectQuotaTargets(state?.apps ?? []);
   const hasAgy = Boolean(agyTiers && agyTiers.length > 0);
   const isEmpty = quotaTargets.length === 0 && !hasAgy && !agyError;

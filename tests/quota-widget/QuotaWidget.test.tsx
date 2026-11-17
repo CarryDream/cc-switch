@@ -57,7 +57,6 @@ const texts: PanelTexts = {
 const weekReset = () => new Date(Date.now() + 3 * 86400000).toISOString();
 function fixture(): TrayPanelState {
   return {
-    texts,
     problems: [],
     feedback: null,
     lightweight: false,
@@ -108,6 +107,7 @@ beforeEach(() => {
   vi.mocked(quotaWidgetApi.ready).mockResolvedValue({
     glass: "acrylic",
     platform: "windows",
+    texts,
   });
   vi.mocked(quotaWidgetApi.appearance).mockResolvedValue({
     glass: "acrylic",

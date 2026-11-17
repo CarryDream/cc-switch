@@ -222,6 +222,20 @@ pub struct WidgetGlass {
     pub platform: &'static str,
 }
 
+/// `quota_widget_ready` 的回执：玻璃模式、平台，外加面板文案。
+///
+/// 悬浮窗不加载界面的 i18n（和托盘面板一样，文案由后端下发），而
+/// `tray_panel_state` 里**没有**文案（`PanelModel` 从来就没有 `texts` 字段，
+/// 托盘面板的文案走 `tray_panel_placement`）。首帧就把文案交给前端，
+/// 否则前端只能一直画骨架屏。
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WidgetReady {
+    pub glass: &'static str,
+    pub platform: &'static str,
+    pub texts: crate::tray_panel::PanelTexts,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WidgetPosition {
@@ -236,10 +250,11 @@ pub fn quota_widget_ready(
     position: Option<WidgetPosition>,
     width: f64,
     height: f64,
-) -> WidgetGlass {
-    let info = WidgetGlass {
+) -> WidgetReady {
+    let info = WidgetReady {
         glass: platform::glass(),
         platform: std::env::consts::OS,
+        texts: crate::tray_panel::PanelTexts::from_language(&crate::tray::tray_language()),
     };
     let Some(window) = widget_window(&app) else {
         return info;

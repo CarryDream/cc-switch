@@ -82,8 +82,11 @@ export interface PanelApp {
   rows: PanelRow[];
 }
 
+/**
+ * 后端 `tray::PanelModel`：**没有** `texts` 字段。文案由 `quota_widget_ready`
+ * 单独下发（托盘面板那边是随 `tray_panel_placement` 走的）。
+ */
 export interface TrayPanelState {
-  texts: PanelTexts;
   problems: PanelLink[];
   feedback: string | null;
   apps: PanelApp[];
@@ -121,10 +124,15 @@ export interface AgyAccountQuota {
   credentialStatus?: string;
 }
 
-/** 后端 `quota_widget_ready` 的回执：背后是哪种玻璃、什么平台。 */
+/** 后端 `quota_widget_ready` / `quota_widget_appearance` 的回执：玻璃模式、平台。 */
 export interface WidgetGlass {
   glass: "native" | "acrylic" | "frosted";
   platform: string;
+}
+
+/** `quota_widget_ready` 额外带上首帧文案（悬浮窗不加载界面的 i18n）。 */
+export interface WidgetReady extends WidgetGlass {
+  texts: PanelTexts;
 }
 
 export const quotaWidgetApi = {
@@ -134,7 +142,7 @@ export const quotaWidgetApi = {
   refresh: () => invoke<void>("quota_widget_refresh"),
   /** 前端加载完成：摆好位置和尺寸后显示，拿回玻璃模式 */
   ready: (position: WidgetPosition | null, width: number, height: number) =>
-    invoke<WidgetGlass>("quota_widget_ready", { position, width, height }),
+    invoke<WidgetReady>("quota_widget_ready", { position, width, height }),
   appearance: (dark: boolean) =>
     invoke<WidgetGlass>("quota_widget_appearance", { dark }),
   /** 内容变了：窗口跟着改尺寸 */
