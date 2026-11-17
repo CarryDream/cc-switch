@@ -279,11 +279,6 @@ pub async fn quota_widget_refresh(app: AppHandle) {
     crate::tray::refresh_panel_provider_usage(&app).await;
 }
 
-#[tauri::command]
-pub fn quota_widget_hide(app: AppHandle) {
-    set_enabled(&app, false);
-}
-
 /// 双击悬浮窗打开主窗口（和左键点托盘图标同一条路径）。
 #[tauri::command]
 pub fn quota_widget_show_main(app: AppHandle) {

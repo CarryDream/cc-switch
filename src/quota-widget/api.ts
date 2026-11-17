@@ -140,7 +140,6 @@ export const quotaWidgetApi = {
   /** 内容变了：窗口跟着改尺寸 */
   layout: (width: number, height: number) =>
     invoke<void>("quota_widget_layout", { width, height }),
-  hide: () => invoke<void>("quota_widget_hide"),
   /** 双击卡片：打开主窗口 */
   showMain: () => invoke<void>("quota_widget_show_main"),
   /** Antigravity 当前登录号的额度（每次都是网络请求，别调太勤） */
