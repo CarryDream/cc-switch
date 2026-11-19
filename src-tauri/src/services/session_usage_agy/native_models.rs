@@ -208,25 +208,25 @@ fn read_generations(path: &Path, steps: &[u64]) -> rusqlite::Result<HashMap<u64,
             .map(|response| response.model);
         // Orchestrator's display field names the mode (or just "Gemini Flash"),
         // while field 19 identifies the planner/worker that produced this step.
-        // Aliases are mapped through the shared table in `session_usage_agy`; unknown IDs
-        // keep their configured pricing.
+        // Only these exact AGY aliases are mapped; unknown IDs keep their configured pricing.
         // https://antigravity.google/docs/models#orchestrator
-        let tiered_id = tiered.as_deref().map(super::model_id_of);
-        // Field 21 only wins when it names a concrete model or tier. `Orchestrator (Argon)`
-        // is the mode, not a model: it picks the planner, and aliases are not models either.
-        let tiered = tiered.as_deref().filter(|_| {
-            let id = tiered_id.as_deref().unwrap_or_default();
-            !(super::is_orchestrator(id)
-                || super::is_native_alias(id)
-                || matches!(id, "gemini-flash" | "gemini-flash-worker-agy"))
+        let orchestrator_model = match base.as_deref() {
+            Some("gemini-pro-orchestrator") => Some("gemini-4-carbon"),
+            Some("gemini-pro-orchestrator-argon" | "gemini-pro-orchestrator-g1-pro") => {
+                Some("gemini-4-argon")
+            }
+            Some("gemini-pro-orchestrator-neon") => Some("gemini-4-neon"),
+            Some("gemini-flash-worker-agy") => Some("gemini-4-hydrogen"),
+            _ => None,
+        };
+        let tiered = tiered.filter(|model| {
+            let id = super::model_id_of(model);
+            // Keep a concrete field-21 model/tier if a newer AGY build supplies one.
+            !(orchestrator_model.is_some()
+                && (super::is_orchestrator(&id)
+                    || matches!(id.as_str(), "gemini-flash" | "gemini-flash-worker-agy")))
         });
-        // The planner of Orchestrator is selected by mode: Carbon / Argon.
-        let orchestrator_model = tiered_id
-            .as_deref()
-            .and_then(super::orchestrator_mode)
-            .map(|mode| format!("gemini-4-{mode}"))
-            .or_else(|| base.as_deref().and_then(super::native_alias).map(str::to_string));
-        let model = [tiered.map(str::to_string), orchestrator_model, base]
+        let model = [tiered, orchestrator_model.map(str::to_string), base]
             .into_iter()
             .flatten()
             .map(|model| model.trim().to_string())
@@ -332,6 +332,8 @@ mod tests {
                 (5, 2, "gemini-pro-orchestrator-argon"),
                 (7, 3, "future-worker"),
                 (9, 4, "gemini-flash-worker-agy"),
+                (11, 5, "gemini-pro-orchestrator-neon"),
+                (13, 6, "gemini-pro-orchestrator-g1-pro"),
             ],
         );
         set_test_generation(
@@ -358,12 +360,26 @@ mod tests {
             "gemini-flash-worker-agy",
             &test_model_id("gemini-4-hydrogen-high"),
         );
-        let models = read_models(&path, &[1, 3, 5, 7, 9]).unwrap();
+        set_test_generation(
+            &conn,
+            5,
+            "gemini-pro-orchestrator-neon",
+            &test_model_id("Orchestrator (Neon)"),
+        );
+        set_test_generation(
+            &conn,
+            6,
+            "gemini-pro-orchestrator-g1-pro",
+            &test_model_id("Orchestrator (Argon)"),
+        );
+        let models = read_models(&path, &[1, 3, 5, 7, 9, 11, 13]).unwrap();
         assert_eq!(models[&1], "gemini-4-carbon");
         assert_eq!(models[&3], "gemini-4-hydrogen");
         assert_eq!(models[&5], "gemini-4-argon");
         assert_eq!(models[&7], "future-worker");
         assert_eq!(models[&9], "gemini-4-hydrogen-high");
+        assert_eq!(models[&11], "gemini-4-neon");
+        assert_eq!(models[&13], "gemini-4-argon");
     }
 
     #[test]

@@ -88,12 +88,12 @@ agy 在转录的 `model` 字段和原生库字段 19 里会直接写**内部别�
 
 处理方式：
 
-- 转录里读到别名时**不算定论**，仍然去原生库按字段 21 的档位取真实模型（别名丢了档位）。
-- 原生库读不到时按别名表退到实际模型（planner 按字段 21 的档位定 Carbon / Argon；flash worker 退到 Hydrogen 本体）。
-- 已经按别名导入过的明细，同步开头会一次性改名并重算成本；定价层也认得别名（含已被汇总的历史）作为兜底。
-- 目前见过的只有 Orchestrator 相关的三个别名，新写法请补 `session_usage_agy::NATIVE_ALIASES` 与 `usage_stats::agy_native_alias` 两处。
+- 转录里读到别名时**不算定论**：Orchestrator 的 planner 按显示名里的模式归到 Carbon / Argon / Neon，flash worker 去原生库取字段 21 的实际档位。
+- 原生库读不到时**不猜**：planner 保留别名、费用记 0（`unknown` 那个口径），flash worker 明确退到 `gemini-4-hydrogen` 本体。
+- 已经按别名导入过的明细，同步开头会一次性改名成实际模型，再由既有的缺价回填重算成本（`session_usage_agy::heal_alias_models`）。
+- 新写法请同时补 `native_models` 的别名映射与 `heal_alias_models` 的别名表。
 
-无法确定的模型仍记为 `unknown`。费用沿用现有模型价格表估算，不代表实际账单；查不到价格时为 0；只有基础模型名时，`-n`、`-tiered` 等原生后缀也沿用同一价格匹配规则，不按后缀推定价格。用量导入不从当前供应商反推历史模型，也不更改原生登录、订阅额度或计费。
+无法确定的模型仍记为 `unknown`。费用沿用现有模型价格表估算，不代表实际账单；查不到价格时为 0；Gemini Flash 的原生 `-tiered` 接口名（如 `gemini-3.8-flash-tiered`、`gemini-3.7-flash-tiered`）在没有独立自定义价格时精确回退到同名基础 `gemini-<版本>-flash` 价格估算（不会前缀匹配到 `-flash-lite` 等子型号），`-n` 等其他原生后缀仍沿用原有价格匹配规则。用量导入不从当前供应商反推历史模型，也不更改原生登录、订阅额度或计费。
 
 ## 验证
 
