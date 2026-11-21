@@ -111,7 +111,7 @@ pub struct AgyAccountStatus {
     pub accounts: Vec<AgyAccount>,
     /// agy 当前登录的是哪个已收录的号；没登录、或读不到钥匙串时为 `None`
     pub current_account_id: Option<String>,
-    /// 这个平台能不能切号（目前是 macOS 和 Windows）
+    /// 这个平台能不能切号（macOS、Windows 和 Linux）。
     pub supported: bool,
 }
 
@@ -286,7 +286,7 @@ impl AgyAccountManager {
         let mut store = self.store.lock().await;
         let mut current = None;
         if keychain::supported() {
-            match self.read_live(&store).await {
+            match self.read_live(&store, false).await {
                 Ok(live) => {
                     let (id, changed) = absorb(&mut store, live, false);
                     current = id;
@@ -323,7 +323,7 @@ impl AgyAccountManager {
             ));
         }
 
-        let live = self.read_live(&store).await?;
+        let live = self.read_live(&store, true).await?;
         if let LiveLogin::Unrecognized(raw) = &live {
             self.stash_unrecognized(raw)?;
         }
@@ -342,7 +342,7 @@ impl AgyAccountManager {
         run_blocking(move || login.write(&encoded)).await?;
 
         // 写完读回来核对，钥匙串偶尔会静默失败
-        let written = match self.read_live(&store).await? {
+        let written = match self.read_live(&store, false).await? {
             LiveLogin::Known { credential, .. } => {
                 refresh_token_of(&credential).map(str::to_string)
             }
@@ -410,58 +410,46 @@ impl AgyAccountManager {
         }
     }
 
-    /// agy 现在登着的号的额度（跟随 agy 登录的卡片用）。无登录返回 `None`；读取失败或
-    /// 凭据无法识别时返回错误，避免把钥匙串故障伪装成“没登录”。
-    pub async fn live_quota(
-        &self,
-    ) -> Result<Option<quota::AccountQuota>, AccountQuotaError> {
-        let Some(account_id) = self.live_account_id().await? else {
-            return Ok(None);
-        };
-        self.quota(&account_id).await.map(Some)
+    /// agy 现在登着的号的额度（跟随 agy 登录的卡片用）。钥匙串里没有认得出的已收录账号时
+    /// 返回 `None`（没登录、读不到、格式不认识、或用户在 CC Switch 里删过这个号），由调用方
+    /// 改问 agy 自己。
+    pub async fn live_quota(&self) -> Option<Result<quota::AccountQuota, AccountQuotaError>> {
+        let account_id = self.live_account_id().await?;
+        Some(self.quota(&account_id).await)
     }
 
     /// 把钥匙串里的登录收进账号表，返回它对应的已收录账号。
-    async fn live_account_id(&self) -> Result<Option<String>, AccountQuotaError> {
-        if !keychain::quota_read_supported() {
-            return Ok(None);
+    async fn live_account_id(&self) -> Option<String> {
+        if !keychain::supported() {
+            return None;
         }
         let mut store = self.store.lock().await;
-        let live = self
-            .read_live(&store)
-            .await
-            .map_err(|error| AccountQuotaError::Failed(error.to_string()))?;
-        if matches!(&live, LiveLogin::Unrecognized(_)) {
-            return Err(AccountQuotaError::Failed(
-                "Antigravity sign-in data in the system credential store is invalid or unrecognized".into(),
-            ));
-        }
+        let live = match self.read_live(&store, false).await {
+            Ok(live) => live,
+            Err(error) => {
+                log::warn!("[AgyAccount] 读取 agy 当前登录失败: {error}");
+                return None;
+            }
+        };
         let (id, changed) = absorb(&mut store, live, false);
         if changed {
             if let Err(error) = self.persist(&store) {
                 log::warn!("[AgyAccount] 保存账号文件失败: {error}");
             }
         }
-        Ok(id)
+        id
     }
 
     /// 这个账号还能用的 access token。agy 在用的号先从钥匙串收回 agy 续过的那份。
     async fn access_token(&self, account_id: &str) -> Result<String, AccountQuotaError> {
         {
             let mut store = self.store.lock().await;
-            if keychain::quota_read_supported() {
-                let live = self
-                    .read_live(&store)
-                    .await
-                    .map_err(|error| AccountQuotaError::Failed(error.to_string()))?;
-                if matches!(&live, LiveLogin::Unrecognized(_)) {
-                    return Err(AccountQuotaError::Failed(
-                        "Antigravity sign-in data in the system credential store is invalid or unrecognized".into(),
-                    ));
-                }
-                if absorb(&mut store, live, false).1 {
-                    if let Err(error) = self.persist(&store) {
-                        log::warn!("[AgyAccount] 保存账号文件失败: {error}");
+            if keychain::supported() {
+                if let Ok(live) = self.read_live(&store, false).await {
+                    if absorb(&mut store, live, false).1 {
+                        if let Err(error) = self.persist(&store) {
+                            log::warn!("[AgyAccount] 保存账号文件失败: {error}");
+                        }
                     }
                 }
             }
@@ -523,9 +511,20 @@ impl AgyAccountManager {
     /// id_token，只有 `id_token_email`（可能带 `writer_id`），先按 refresh token、再按邮箱对已收录的号；
     /// 都对不上（agy 里新登录的号）时用 access token 问 Google（若 access token 已过期则先拿
     /// refresh token 续期）。
-    async fn read_live(&self, store: &StoreFile) -> Result<LiveLogin, AppError> {
+    async fn read_live(
+        &self,
+        store: &StoreFile,
+        allow_unlock: bool,
+    ) -> Result<LiveLogin, AppError> {
         let login = Arc::clone(&self.login);
-        let raw = run_blocking(move || login.read()).await?;
+        let raw = run_blocking(move || {
+            if allow_unlock {
+                login.read_for_switch()
+            } else {
+                login.read()
+            }
+        })
+        .await?;
         let Some(raw) = raw else {
             return Ok(LiveLogin::None);
         };

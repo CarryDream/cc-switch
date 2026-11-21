@@ -9,27 +9,24 @@ use super::*;
 struct MemoryLogin {
     value: StdMutex<Option<String>>,
     writes: StdMutex<usize>,
+    locked: StdMutex<bool>,
 }
 
 impl AgyLoginStore for MemoryLogin {
     fn read(&self) -> Result<Option<String>, AppError> {
+        if *self.locked.lock().unwrap() {
+            return Err(AppError::Config("test keychain is locked".into()));
+        }
         Ok(self.value.lock().unwrap().clone())
+    }
+    fn read_for_switch(&self) -> Result<Option<String>, AppError> {
+        *self.locked.lock().unwrap() = false;
+        self.read()
     }
     fn write(&self, value: &str) -> Result<(), AppError> {
         *self.value.lock().unwrap() = Some(value.to_string());
         *self.writes.lock().unwrap() += 1;
         Ok(())
-    }
-}
-
-struct ReadErrorLogin;
-
-impl AgyLoginStore for ReadErrorLogin {
-    fn read(&self) -> Result<Option<String>, AppError> {
-        Err(AppError::Config("mock credential read failure".into()))
-    }
-    fn write(&self, _value: &str) -> Result<(), AppError> {
-        unreachable!("quota-only mock must never write credentials")
     }
 }
 
@@ -74,8 +71,8 @@ async fn add(manager: &AgyAccountManager, sub: &str) {
     manager.persist(&store).unwrap();
 }
 
-// 以下测试只在能切号的平台（macOS、Windows）上有意义：其他平台 status 不读钥匙串、切换直接报不支持。
-#[cfg(any(target_os = "macos", windows))]
+// 以下测试只在支持切号的平台上有意义。
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod switching {
     use super::*;
 
@@ -91,6 +88,27 @@ mod switching {
             Some("alice@example.com")
         );
         assert_eq!(*login.writes.lock().unwrap(), 0, "查看状态不写钥匙串");
+    }
+
+    #[tokio::test]
+    async fn status_leaves_a_locked_keychain_alone_but_switch_can_unlock_it() {
+        let (_dir, login, manager) = manager();
+        set_live(&login, &credential("alice", "a1"));
+        add(&manager, "bob").await;
+        *login.locked.lock().unwrap() = true;
+
+        let status = manager.status().await.unwrap();
+        assert!(status.current_account_id.is_none());
+        assert_eq!(status.accounts.len(), 1);
+        assert!(*login.locked.lock().unwrap());
+
+        manager.switch_to("bob").await.unwrap();
+        assert_eq!(live_sub(&login).as_deref(), Some("bob"));
+        assert!(manager
+            .list()
+            .await
+            .iter()
+            .any(|account| account.id == "alice"));
     }
 
     #[tokio::test]
@@ -213,7 +231,7 @@ mod switching {
     async fn following_cards_query_the_account_agy_is_signed_in_with() {
         let (_dir, login, manager) = manager();
         assert_eq!(
-            manager.live_account_id().await.unwrap(),
+            manager.live_account_id().await,
             None,
             "agy 没登录时改问 agy"
         );
@@ -221,15 +239,12 @@ mod switching {
         add(&manager, "alice").await;
         set_live(&login, &credential("bob", "b1"));
         // 还没收录的号也收进来，之后直接查
-        assert_eq!(
-            manager.live_account_id().await.unwrap().as_deref(),
-            Some("bob")
-        );
+        assert_eq!(manager.live_account_id().await.as_deref(), Some("bob"));
         assert_eq!(manager.list().await.len(), 2);
 
         // 在 CC Switch 里删掉的号不再收回来，改问 agy
         manager.remove("bob").await.unwrap();
-        assert_eq!(manager.live_account_id().await.unwrap(), None);
+        assert_eq!(manager.live_account_id().await, None);
         assert_eq!(*login.writes.lock().unwrap(), 0);
     }
 
@@ -272,10 +287,7 @@ mod switching {
         live["token"]["refresh_token"] = json!("another-refresh");
         live["id_token_email"] = json!("Alice@Example.com");
         set_live(&login, &live);
-        assert_eq!(
-            manager.live_account_id().await.unwrap().as_deref(),
-            Some("alice")
-        );
+        assert_eq!(manager.live_account_id().await.as_deref(), Some("alice"));
         let store = manager.store.lock().await;
         assert_eq!(
             store.accounts["alice"].credential["token"]["refresh_token"],
@@ -315,7 +327,7 @@ mod switching {
         let status = manager.status().await.unwrap();
         assert_eq!(status.current_account_id, None);
         assert_eq!(status.accounts.len(), 1);
-        assert_eq!(manager.live_account_id().await.unwrap(), None);
+        assert_eq!(manager.live_account_id().await, None);
 
         // 切走时照样收录回 accounts，不会当成不认识的登录存进 stash
         manager.switch_to("bob").await.unwrap();
@@ -382,6 +394,7 @@ mod switching {
     /// Windows 经凭据管理器）、原地更新、读回都正常。默认不跑：`cargo test agy_account -- --ignored`。
     #[test]
     #[ignore]
+    #[cfg(any(target_os = "macos", windows))]
     fn real_keychain_round_trip_on_a_test_item() {
         let store = keychain::SystemKeychain::named("cc-switch-agy-selftest", "probe");
         let first = keychain::encode(&credential("probe", "one")).unwrap();
@@ -405,32 +418,6 @@ mod switching {
             .arg("/delete:cc-switch-agy-selftest:probe")
             .output();
     }
-}
-
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-#[tokio::test]
-async fn live_quota_distinguishes_missing_invalid_and_unreadable_credentials() {
-    let dir = tempfile::tempdir().unwrap();
-    let missing = AgyAccountManager::with_login_store(
-        dir.path().to_path_buf(),
-        Arc::new(MemoryLogin::default()),
-    );
-    assert!(missing.live_quota().await.unwrap().is_none());
-
-    let invalid_login = Arc::new(MemoryLogin::default());
-    *invalid_login.value.lock().unwrap() = Some("not JSON".into());
-    let invalid = AgyAccountManager::with_login_store(dir.path().to_path_buf(), invalid_login);
-    assert!(matches!(
-        invalid.live_quota().await,
-        Err(AccountQuotaError::Failed(message)) if message.contains("invalid or unrecognized")
-    ));
-
-    let unreadable =
-        AgyAccountManager::with_login_store(dir.path().to_path_buf(), Arc::new(ReadErrorLogin));
-    assert!(matches!(
-        unreadable.live_quota().await,
-        Err(AccountQuotaError::Failed(message)) if message.contains("mock credential read failure")
-    ));
 }
 
 #[tokio::test]
