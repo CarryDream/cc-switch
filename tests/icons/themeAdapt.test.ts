@@ -54,7 +54,16 @@ describe("needsLightBacking", () => {
     expect(needsLightBacking("sssaicode")).toBe(false);
     expect(needsLightBacking("openai")).toBe(false);
     expect(needsLightBacking("anthropic")).toBe(false);
+    expect(needsLightBacking("factory")).toBe(false);
     expect(needsLightBacking("atlascloud")).toBe(true);
+  });
+
+  it("exposes Factory Droid as a currentColor SVG icon", () => {
+    const factorySvg = getIcon("factory");
+    expect(factorySvg).toContain("<title>Factory</title>");
+    expect(factorySvg).toContain('fill="currentColor"');
+    expect(factorySvg).toContain('viewBox="78 78 352 352"');
+    expect(adaptSvgToTheme(factorySvg)).toBe(factorySvg);
   });
 
   it("backs multi-color SVGs that keep near-black ink after adaptation", () => {

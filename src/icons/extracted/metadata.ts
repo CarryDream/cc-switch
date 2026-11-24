@@ -478,6 +478,13 @@ export const iconMetadata: Record<string, IconMetadata> = {
     keywords: [],
     defaultColor: "currentColor",
   },
+  factory: {
+    name: "factory",
+    displayName: "Factory Droid",
+    category: "ai-provider",
+    keywords: ["factory", "droid", "factory droid"],
+    defaultColor: "currentColor",
+  },
   gemini: {
     name: "gemini",
     displayName: "Gemini",

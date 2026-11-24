@@ -361,6 +361,31 @@ describe("UsageDashboard", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders the Factory Droid logo in the app filter and filters to droid", async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+
+    const droidButton = screen.getByRole("button", { name: "Factory Droid" });
+    expect(droidButton.querySelector("svg title")?.textContent).toBe("Factory");
+    expect(droidButton.textContent).not.toBe("Dr");
+
+    await user.click(droidButton);
+
+    await waitFor(() =>
+      expect(useProviderStatsMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { appType: "droid" },
+        expect.anything(),
+      ),
+    );
+    expect(usageHeroMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ appType: "droid" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Factory Droid", pressed: true }),
+    ).toBeInTheDocument();
+  });
+
   it("starts with the app filter passed in from an app page", () => {
     renderDashboard({ initialAppType: "codex" });
 

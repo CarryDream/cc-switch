@@ -3,7 +3,7 @@ import type { AppId } from "@/lib/api";
 
 /**
  * 只导入了用量、还没做成应用（没有 `AppId`）的客户端。用量页认得它们，
- * 但没有品牌图标、没有供应商卡片，名字单独给。
+ * 没有供应商卡片，名字单独给（品牌图标见 `AppGlyph` 的 `APP_ICON_NAME`）。
  */
 export const USAGE_ONLY_APP_NAMES: Record<
   string,

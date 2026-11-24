@@ -713,6 +713,34 @@ describe("RequestLogTable optional columns", () => {
     expect(formatHitPercent(0.5)).toBe("50.0%");
     expect(formatHitPercent(0)).toBe("0.0%");
   });
+
+  it("renders the Factory Droid logo in the app column for droid logs", () => {
+    useRequestLogsMock.mockReturnValue({
+      data: {
+        data: [
+          {
+            ...base,
+            requestId: "droid-1",
+            appType: "droid",
+            providerName: "Factory Droid (Session)",
+            dataSource: "droid_session",
+          },
+        ],
+        total: 1,
+        page: 0,
+        pageSize: 20,
+      },
+      isLoading: false,
+    });
+
+    render(
+      <RequestLogTable range={{ preset: "today" }} refreshIntervalMs={0} />,
+    );
+
+    const row = screen.getAllByRole("row")[1];
+    expect(row.querySelector("svg title")?.textContent).toBe("Factory");
+    expect(row).toHaveTextContent(appShortName("droid"));
+  });
 });
 
 describe("formatLogTime", () => {

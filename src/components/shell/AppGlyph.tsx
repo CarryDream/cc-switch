@@ -23,7 +23,11 @@ export const APP_DISPLAY_NAME: Record<AppId, string> = {
   workbuddy: "WorkBuddy",
 };
 
-const APP_ICON_NAME: Record<AppId, string> = {
+/** 只在用量页出现、尚未接入应用管理（没有 `AppId`）但有品牌图标的客户端。 */
+export type UsageOnlyAppGlyphId = "droid";
+export type AppGlyphId = AppId | UsageOnlyAppGlyphId;
+
+const APP_ICON_NAME: Record<AppGlyphId, string> = {
   claude: "claude",
   "claude-desktop": "claude",
   codex: "openai",
@@ -40,16 +44,21 @@ const APP_ICON_NAME: Record<AppId, string> = {
   omp: "omp",
   copilot: "githubcopilot",
   workbuddy: "workbuddy",
+  droid: "factory",
 };
 
+export function hasAppGlyph(appType: string): appType is AppGlyphId {
+  return appType in APP_ICON_NAME;
+}
+
 // Claude Code 和 Claude Desktop 用同一个图标，靠右下角的小角标区分终端与桌面
-const APP_BADGE_ICON: Partial<Record<AppId, typeof Terminal>> = {
+const APP_BADGE_ICON: Partial<Record<AppGlyphId, typeof Terminal>> = {
   claude: Terminal,
   "claude-desktop": Monitor,
 };
 
 interface AppGlyphProps {
-  app: AppId;
+  app: AppGlyphId;
   /** 图标边长：侧栏 16，页头 20 */
   size?: number;
   /** 角标底色要和所在的行一致，否则看起来像缺了一块 */

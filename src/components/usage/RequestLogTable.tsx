@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useRequestLogs } from "@/lib/query/usage";
 import { TablePagination } from "./TablePagination";
 import { HelpTip } from "@/components/ui/help-tip";
-import { AppGlyph } from "@/components/shell/AppGlyph";
+import { AppGlyph, hasAppGlyph } from "@/components/shell/AppGlyph";
 import {
   isUnpricedUsage,
   omitsCacheWrites,
@@ -103,7 +103,7 @@ export {
   USAGE_ONLY_APP_NAMES,
   usageOnlyMonogram,
 } from "./appLabels";
-import { appDisplayName, appShortName, isKnownAppId } from "./appLabels";
+import { appDisplayName, appShortName } from "./appLabels";
 
 const isSuccessStatus = (code: number) => code >= 200 && code < 300;
 
@@ -425,7 +425,7 @@ export function RequestLogTable({
             className="flex items-center gap-1.5"
             title={appDisplayName(log.appType)}
           >
-            {isKnownAppId(log.appType) && (
+            {hasAppGlyph(log.appType) && (
               <AppGlyph
                 app={log.appType}
                 size={14}

@@ -14,7 +14,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { AppPageHeader } from "@/components/shell/AppPageHeader";
-import { AppGlyph } from "@/components/shell/AppGlyph";
+import { AppGlyph, hasAppGlyph } from "@/components/shell/AppGlyph";
 import { HelpTip } from "@/components/ui/help-tip";
 import { PageTabs } from "@/components/ui/page-tabs";
 import { Button } from "@/components/ui/button";
@@ -58,11 +58,7 @@ import { cn } from "@/lib/utils";
 import { UsageHero } from "./UsageHero";
 import { UsageTrendChart } from "./UsageTrendChart";
 import { RequestLogTable } from "./RequestLogTable";
-import {
-  appDisplayName,
-  isKnownAppId,
-  usageOnlyMonogram,
-} from "./appLabels";
+import { appDisplayName, isKnownAppId, usageOnlyMonogram } from "./appLabels";
 import { ProviderStatsTable } from "./ProviderStatsTable";
 import { ModelStatsTable } from "./ModelStatsTable";
 import { PricingConfigPanel } from "./PricingConfigPanel";
@@ -621,8 +617,8 @@ export function UsageDashboard({
         >
           {t("usage.appFilter.all")}
         </button>
-        {/* 应用只露图标，名字放悬停提示和 aria-label；只导入用量的应用没有品牌图标，
-            用两位字母标记顶上（`droid` 之类，见 `USAGE_ONLY_APP_NAMES`） */}
+        {/* 应用只露图标，名字放悬停提示和 aria-label；没有品牌图标的只导入用量应用
+            用两位字母标记顶上（见 `USAGE_ONLY_APP_NAMES`） */}
         {filterApps.map((app) => (
           <HoverTip key={app} content={appDisplayName(app)}>
             <button
@@ -635,7 +631,7 @@ export function UsageDashboard({
               )}
               onClick={() => changeAppType(app)}
             >
-              {isKnownAppId(app) ? (
+              {hasAppGlyph(app) ? (
                 <AppGlyph
                   app={app}
                   size={16}

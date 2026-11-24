@@ -211,7 +211,7 @@ export interface UsageRangeSelection {
  * 用量页按应用筛选用的应用 ID。
  *
  * `droid`（Factory Droid）只从会话日志导入用量，还没做成应用（没有 `AppId`）：
- * 它在用量页里能筛、能看，但没有图标、没有供应商卡片。
+ * 它在用量页里能筛、能看，但没有供应商卡片。
  */
 export type AppType =
   | "droid"
