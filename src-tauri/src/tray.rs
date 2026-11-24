@@ -2551,7 +2551,9 @@ fn panel_quota(
                 .iter()
                 .map(|line| PanelQuotaLine {
                     text: line.text.clone(),
-                    left: line.left.is_finite().then(|| line.left.clamp(0.0, 100.0)),
+                    // 套餐过期在 `plan_line` 中以 `-1.0` 标记，不画成 0% 进度条。
+                    left: (line.left.is_finite() && line.left >= 0.0)
+                        .then(|| line.left.clamp(0.0, 100.0)),
                     warn: line.left < WARN_BELOW_PERCENT,
                     resets_at: line.resets_at.clone(),
                     emphasis: line.emphasis.clone(),
@@ -3015,6 +3017,7 @@ fn update_tray_usage_labels(app: &tauri::AppHandle) {
     #[cfg(not(target_os = "linux"))]
     {
         crate::tray_panel::notify_changed(app);
+        crate::quota_widget::notify_changed(app);
         // 出面板时托盘上没挂原生菜单，没有标题要改
         if !crate::tray_panel::uses_native_menu() {
             return;
@@ -3060,6 +3063,7 @@ pub fn refresh_tray_menu(app: &tauri::AppHandle) {
         }
     }
     crate::tray_panel::notify_changed(app);
+    crate::quota_widget::notify_changed(app);
 }
 
 /// 设置里切换了原生托盘菜单 / 托盘面板：当场换掉托盘的点击行为，不用重启。

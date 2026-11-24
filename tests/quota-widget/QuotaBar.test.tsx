@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { QuotaBar, quotaPercent, quotaStatus } from "@/quota-widget/QuotaBar";
+import {
+  QuotaBar,
+  quotaPercent,
+  quotaStatus,
+  quotaTone,
+} from "@/quota-widget/QuotaBar";
 
 // 同一个槽的几何由 widget.css 统一定义，不能再为单档和双档选择不同容器。
 describe("QuotaBar", () => {
@@ -40,6 +45,39 @@ describe("QuotaBar", () => {
     expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "0");
   });
 
+  it("applies a 2.5% visual floor for tiny non-zero values so 1-2% stays distinct from 0%", () => {
+    const { container, rerender } = render(<QuotaBar left={1} label="5h" />);
+    expect(container.querySelector(".qw-bar-fill")).toHaveStyle(
+      "transform: scaleX(0.025)",
+    );
+    expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "1");
+    expect(screen.getByRole("meter")).toHaveAttribute("data-tone", "warn");
+
+    rerender(<QuotaBar left={2} label="5h" />);
+    expect(container.querySelector(".qw-bar-fill")).toHaveStyle(
+      "transform: scaleX(0.025)",
+    );
+
+    rerender(<QuotaBar left={3} label="5h" />);
+    expect(container.querySelector(".qw-bar-fill")).toHaveStyle(
+      "transform: scaleX(0.03)",
+    );
+  });
+
+  it("omits data-tauri-drag-region when draggable is false", () => {
+    const { container } = render(
+      <QuotaBar
+        left={60}
+        label="5h"
+        weekly={{ left: 40, label: "7d" }}
+        draggable={false}
+      />,
+    );
+    expect(container.querySelectorAll("[data-tauri-drag-region]")).toHaveLength(
+      0,
+    );
+  });
+
   it("uses the same track for single and dual quotas", () => {
     const { container, rerender } = render(<QuotaBar left={45} label="5h" />);
     expect(screen.getByRole("meter")).toHaveClass("qw-bar-track");
@@ -60,5 +98,26 @@ describe("QuotaBar", () => {
     expect(quotaPercent(120)).toBe(100);
     expect(quotaPercent(Number.NaN)).toBe(0);
     expect(quotaPercent(Number.POSITIVE_INFINITY)).toBe(0);
+    expect(quotaTone(100)).toBe("high");
+    expect(quotaTone(85)).toBe("high");
+    expect(quotaTone(84)).toBe("mid");
+    expect(quotaTone(45)).toBe("mid");
+    expect(quotaTone(44)).toBe("low");
+    expect(quotaTone(20)).toBe("low");
+    expect(quotaTone(19)).toBe("warn");
+    expect(quotaTone(0)).toBe("danger");
+  });
+
+  it("exposes tone and weekly variant attributes for visual styling", () => {
+    const { container } = render(
+      <QuotaBar left={90} label="7d" variant="weekly" />,
+    );
+    const meter = screen.getByRole("meter");
+    expect(meter).toHaveAttribute("data-tone", "high");
+    expect(meter).toHaveAttribute("data-variant", "weekly");
+    expect(container.querySelector(".qw-bar-fill")).toHaveAttribute(
+      "data-variant",
+      "weekly",
+    );
   });
 });

@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"npx vitest run tests/quota-widget/formatReset.test.ts tests/components/TrayPanel.test.tsx\",\"description\":\"Run unit tests for quota-widget and TrayPanel\"}",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mD:/dev/opensource/ai/cc-switch/src-tauri\u001b[39m\n\n\u001b[2mfilter:  \u001b[22m\u001b[33mtests/quota-widget/formatReset.test.ts\u001b[2m, \u001b[22mtests/components/TrayPanel.test.tsx\u001b[39m\n\u001b[2minclude: \u001b[22m\u001b[33m{src,tests}/**/*.{test,spec}.{ts,tsx,js,jsx}\u001b[39m\n\u001b[2mexclude:  \u001b[22m\u001b[33m**/node_modules/**\u001b[2m, \u001b[22m**/dist/**\u001b[2m, \u001b[22m**/cypress/**\u001b[2m, \u001b[22m**/.{idea,git,cache,output,temp}/**\u001b[2m, \u001b[22m**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,ny...",
-  "timestamp": "2026-10-22T05:46:21.126Z",
-  "retry_count": 1
-}

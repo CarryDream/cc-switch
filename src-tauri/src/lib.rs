@@ -535,8 +535,10 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         // 拦截窗口关闭：根据设置决定是否最小化到托盘
         .on_window_event(|window, event| {
-            // 托盘面板自己处理关闭（只隐藏），不走主窗口的「最小化到托盘 / 退出」
-            if window.label() == tray_panel::PANEL_LABEL {
+            // 托盘面板和用量悬浮窗自己处理关闭（只隐藏），不走主窗口的「最小化到托盘 / 退出」
+            if window.label() == tray_panel::PANEL_LABEL
+                || window.label() == quota_widget::WIDGET_LABEL
+            {
                 return;
             }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -1769,11 +1771,15 @@ pub fn run() {
             tray_panel::tray_panel_layout,
             tray_panel::tray_panel_hide,
             tray_panel::tray_panel_action,
+            quota_widget::quota_widget_bootstrap,
             quota_widget::quota_widget_ready,
             quota_widget::quota_widget_appearance,
             quota_widget::quota_widget_layout,
+            quota_widget::quota_widget_reset_position,
             quota_widget::quota_widget_refresh,
             quota_widget::quota_widget_show_main,
+            quota_widget::quota_widget_hide,
+            quota_widget::quota_widget_set_enabled,
             quota_widget::quota_widget_agy_quota,
             tray::tray_app_page_seen,
             commands::exit_proxy_apps_in_mode,

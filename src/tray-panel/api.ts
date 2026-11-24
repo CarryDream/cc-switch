@@ -17,6 +17,24 @@ export interface PanelTexts {
   usageTab: string;
   /** 托盘面板底部开关额度悬浮窗 */
   quotaWidget: string;
+  /** 悬浮窗右键菜单：立即刷新 / 隐藏悬浮窗 */
+  refresh: string;
+  hideWidget: string;
+  /** 档位名（悬浮窗的 Antigravity 行与双档图例用） */
+  tierDual: string;
+  tierFiveHour: string;
+  tierWeekly: string;
+  /** 悬浮窗位置与透明度设置 */
+  lockPosition: string;
+  unlockPosition: string;
+  resetPosition: string;
+  opacityLight: string;
+  opacityBalanced: string;
+  opacitySolid: string;
+  /** 悬浮窗刷新状态文案：`updatedAgo` 使用 `{when}` 占位符 */
+  refreshing: string;
+  updatedJustNow: string;
+  updatedAgo: string;
   /** 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长 */
   resetsIn: string;
   /** 时长单位：`{n}` 是数字；最多取两级，中间用 `durationSep` 隔开 */

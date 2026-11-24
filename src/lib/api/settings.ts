@@ -40,6 +40,11 @@ export const settingsApi = {
     return await invoke("save_settings", { settings });
   },
 
+  /** 开关桌面用量悬浮窗（持久化 enable_quota_widget、显隐悬浮窗并刷新托盘菜单） */
+  async setQuotaWidgetEnabled(enabled: boolean): Promise<void> {
+    await invoke("quota_widget_set_enabled", { enabled });
+  },
+
   /** 是否存在统一 Codex 会话历史的迁移备份（关闭弹窗据此显示"恢复备份"勾选） */
   async hasCodexUnifyHistoryBackup(): Promise<boolean> {
     return await invoke("has_codex_unify_history_backup");

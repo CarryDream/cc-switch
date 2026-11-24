@@ -206,6 +206,28 @@ mod tests {
     }
 
     #[test]
+    fn agy_subscription_round_trip_and_invalidate() {
+        let cache = UsageCache::new();
+        assert!(cache
+            .with_subscription(&AppType::Agy, |q| q.tool.clone())
+            .is_none());
+        let mut agy = fake_quota();
+        agy.tool = "agy".to_string();
+        cache.put_subscription(AppType::Agy, agy);
+        assert_eq!(
+            cache.with_subscription(&AppType::Agy, |q| (q.tool.clone(), q.success)),
+            Some(("agy".to_string(), true))
+        );
+        assert!(cache
+            .with_subscription(&AppType::Claude, |q| q.success)
+            .is_none());
+        cache.invalidate_subscription(&AppType::Agy);
+        assert!(cache
+            .with_subscription(&AppType::Agy, |q| q.success)
+            .is_none());
+    }
+
+    #[test]
     fn script_round_trip_and_invalidate() {
         let cache = UsageCache::new();
         assert!(cache

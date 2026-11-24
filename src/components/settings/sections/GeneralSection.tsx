@@ -1,5 +1,10 @@
+import { useContext, useEffect, useState } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Monitor, Moon, Sun } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { settingsApi } from "@/lib/api/settings";
+import type { Settings } from "@/types";
 import type { SettingsFormState } from "@/hooks/useSettings";
 import { LANGUAGES, type Language } from "@/i18n/languages";
 import { useTheme } from "@/components/theme-provider";
@@ -43,6 +48,38 @@ export function GeneralSection({
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const { density, zoom } = useInterfacePrefs();
+  const queryClient = useContext(QueryClientContext);
+  const [quotaWidgetEnabled, setQuotaWidgetEnabled] = useState(
+    !!settings.enableQuotaWidget,
+  );
+  const [quotaWidgetSaving, setQuotaWidgetSaving] = useState(false);
+
+  useEffect(() => {
+    setQuotaWidgetEnabled(!!settings.enableQuotaWidget);
+  }, [settings.enableQuotaWidget]);
+
+  const handleQuotaWidgetChange = async (next: boolean) => {
+    const previous = quotaWidgetEnabled;
+    setQuotaWidgetEnabled(next);
+    setQuotaWidgetSaving(true);
+    try {
+      await settingsApi.setQuotaWidgetEnabled(next);
+      queryClient?.setQueryData<Settings>(["settings"], (current) =>
+        current ? { ...current, enableQuotaWidget: next } : current,
+      );
+      void queryClient?.invalidateQueries({ queryKey: ["settings"] });
+    } catch (error) {
+      console.error("[GeneralSection] Failed to toggle quota widget", error);
+      setQuotaWidgetEnabled(previous);
+      toast.error(
+        t("settings.saveFailedGeneric", {
+          defaultValue: "保存失败，请重试",
+        }),
+      );
+    } finally {
+      setQuotaWidgetSaving(false);
+    }
+  };
 
   return (
     <>
@@ -292,6 +329,16 @@ export function GeneralSection({
               }
             />
           )}
+          <SettingsSwitchRow
+            label={t("settings.general.quotaWidget")}
+            help={{
+              title: t("settings.general.quotaWidget"),
+              body: t("settings.general.quotaWidgetHelp"),
+            }}
+            checked={quotaWidgetEnabled}
+            disabled={quotaWidgetSaving}
+            onCheckedChange={(value) => void handleQuotaWidgetChange(value)}
+          />
           {isLinux() && (
             <SettingsSwitchRow
               label={t("settings.useAppWindowControls")}

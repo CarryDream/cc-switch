@@ -90,9 +90,23 @@ pub struct PanelTexts {
     pub usage_tab: &'static str,
     /// 托盘面板底部开关额度悬浮窗的一项。
     pub quota_widget: &'static str,
-    /// 档位名（悬浮窗的 Antigravity 行用；翻译同托盘菜单 `TrayTexts`）。
+    /// 悬浮窗右键菜单：立即刷新 / 隐藏悬浮窗 / 位置与透明度控制 / 刷新状态。
+    pub refresh: &'static str,
+    pub hide_widget: &'static str,
+    /// 档位名（悬浮窗的 Antigravity 行与切换器用；翻译同托盘菜单 `TrayTexts`）。
+    pub tier_dual: &'static str,
     pub tier_five_hour: &'static str,
     pub tier_weekly: &'static str,
+    pub lock_position: &'static str,
+    pub unlock_position: &'static str,
+    pub reset_position: &'static str,
+    pub opacity_light: &'static str,
+    pub opacity_balanced: &'static str,
+    pub opacity_solid: &'static str,
+    pub refreshing: &'static str,
+    pub updated_just_now: &'static str,
+    /// 最近更新时间模板：`{when}` 为拼出的时长
+    pub updated_ago: &'static str,
     /// 某一档还有多久重置：`{when}` 是下面几个单位拼出的时长
     pub resets_in: &'static str,
     /// 时长单位：`{n}` 是数字；最多取两级（天+小时、小时+分），中间用 `duration_sep` 隔开
@@ -120,8 +134,20 @@ impl PanelTexts {
                 config_tab: "Configuration",
                 usage_tab: "Usage",
                 quota_widget: "Usage widget",
+                refresh: "Refresh now",
+                hide_widget: "Hide widget",
+                tier_dual: "Both",
                 tier_five_hour: "5-hour",
                 tier_weekly: "Weekly",
+                lock_position: "Lock position",
+                unlock_position: "Unlock position",
+                reset_position: "Reset position",
+                opacity_light: "Sheer",
+                opacity_balanced: "Balanced",
+                opacity_solid: "Solid",
+                refreshing: "Refreshing…",
+                updated_just_now: "Just updated",
+                updated_ago: "Updated {when} ago",
                 resets_in: "Resets in {when}",
                 duration_days: "{n}d",
                 duration_hours: "{n}h",
@@ -142,8 +168,20 @@ impl PanelTexts {
                 config_tab: "Yapılandırma",
                 usage_tab: "Kullanım",
                 quota_widget: "Kullanım widget'ı",
+                refresh: "Şimdi yenile",
+                hide_widget: "Widget'ı gizle",
+                tier_dual: "İkisi",
                 tier_five_hour: "5 saatlik",
                 tier_weekly: "Haftalık",
+                lock_position: "Konumu kilitle",
+                unlock_position: "Kilidi aç",
+                reset_position: "Konumu sıfırla",
+                opacity_light: "Hafif",
+                opacity_balanced: "Dengeli",
+                opacity_solid: "Opak",
+                refreshing: "Yenileniyor…",
+                updated_just_now: "Az önce güncellendi",
+                updated_ago: "{when} önce güncellendi",
                 resets_in: "{when} içinde sıfırlanır",
                 duration_days: "{n} g",
                 duration_hours: "{n} sa",
@@ -164,8 +202,20 @@ impl PanelTexts {
                 config_tab: "Konfiguration",
                 usage_tab: "Nutzung",
                 quota_widget: "Nutzungs-Widget",
+                refresh: "Jetzt aktualisieren",
+                hide_widget: "Widget ausblenden",
+                tier_dual: "Beide",
                 tier_five_hour: "5 Stunden",
                 tier_weekly: "Woche",
+                lock_position: "Position sperren",
+                unlock_position: "Entsperren",
+                reset_position: "Position zurücksetzen",
+                opacity_light: "Leicht",
+                opacity_balanced: "Ausgewogen",
+                opacity_solid: "Deckend",
+                refreshing: "Aktualisiere…",
+                updated_just_now: "Gerade aktualisiert",
+                updated_ago: "Vor {when} aktualisiert",
                 resets_in: "Zurückgesetzt in {when}",
                 duration_days: "{n} T.",
                 duration_hours: "{n} Std.",
@@ -186,8 +236,20 @@ impl PanelTexts {
                 config_tab: "Конфигурация",
                 usage_tab: "Использование",
                 quota_widget: "Виджет использования",
+                refresh: "Обновить",
+                hide_widget: "Скрыть виджет",
+                tier_dual: "Оба",
                 tier_five_hour: "5 часов",
                 tier_weekly: "Неделя",
+                lock_position: "Закрепить",
+                unlock_position: "Открепить",
+                reset_position: "Сбросить позицию",
+                opacity_light: "Лёгкая",
+                opacity_balanced: "Средняя",
+                opacity_solid: "Плотная",
+                refreshing: "Обновление…",
+                updated_just_now: "Только что обновлено",
+                updated_ago: "Обновлено {when} назад",
                 resets_in: "Сброс через {when}",
                 duration_days: "{n} д",
                 duration_hours: "{n} ч",
@@ -208,8 +270,20 @@ impl PanelTexts {
                 config_tab: "설정",
                 usage_tab: "사용량",
                 quota_widget: "사용량 위젯",
+                refresh: "지금 새로고침",
+                hide_widget: "위젯 숨기기",
+                tier_dual: "전체",
                 tier_five_hour: "5시간",
                 tier_weekly: "주간",
+                lock_position: "위치 잠금",
+                unlock_position: "잠금 해제",
+                reset_position: "위치 초기화",
+                opacity_light: "투명",
+                opacity_balanced: "균형",
+                opacity_solid: "진하게",
+                refreshing: "새로고침 중…",
+                updated_just_now: "방금 업데이트",
+                updated_ago: "{when} 전 업데이트",
                 resets_in: "{when} 후 초기화",
                 duration_days: "{n}일",
                 duration_hours: "{n}시간",
@@ -230,8 +304,20 @@ impl PanelTexts {
                 config_tab: "構成",
                 usage_tab: "使用量",
                 quota_widget: "使用量ウィジェット",
+                refresh: "今すぐ更新",
+                hide_widget: "ウィジェットを隠す",
+                tier_dual: "両方",
                 tier_five_hour: "5時間",
                 tier_weekly: "週間",
+                lock_position: "位置を固定",
+                unlock_position: "固定を解除",
+                reset_position: "位置をリセット",
+                opacity_light: "薄め",
+                opacity_balanced: "標準",
+                opacity_solid: "不透明",
+                refreshing: "更新中…",
+                updated_just_now: "たった今更新",
+                updated_ago: "{when}前に更新",
                 resets_in: "{when}後にリセット",
                 duration_days: "{n}日",
                 duration_hours: "{n}時間",
@@ -252,8 +338,20 @@ impl PanelTexts {
                 config_tab: "配置",
                 usage_tab: "用量",
                 quota_widget: "用量懸浮窗",
+                refresh: "立即重新整理",
+                hide_widget: "隱藏懸浮窗",
+                tier_dual: "雙軌",
                 tier_five_hour: "5 小時",
                 tier_weekly: "每週",
+                lock_position: "鎖定位置",
+                unlock_position: "解鎖位置",
+                reset_position: "重設位置",
+                opacity_light: "輕透",
+                opacity_balanced: "均衡",
+                opacity_solid: "實底",
+                refreshing: "重新整理中…",
+                updated_just_now: "剛剛更新",
+                updated_ago: "{when}前更新",
                 resets_in: "{when}後重置",
                 duration_days: "{n}天",
                 duration_hours: "{n}小時",
@@ -274,8 +372,20 @@ impl PanelTexts {
                 config_tab: "配置",
                 usage_tab: "用量",
                 quota_widget: "用量悬浮窗",
+                refresh: "立即刷新",
+                hide_widget: "隐藏悬浮窗",
+                tier_dual: "双轨",
                 tier_five_hour: "5 小时",
                 tier_weekly: "每周",
+                lock_position: "锁定位置",
+                unlock_position: "解锁位置",
+                reset_position: "重置位置",
+                opacity_light: "轻透",
+                opacity_balanced: "均衡",
+                opacity_solid: "实底",
+                refreshing: "刷新中…",
+                updated_just_now: "刚刚更新",
+                updated_ago: "{when}前更新",
                 resets_in: "{when}后重置",
                 duration_days: "{n}天",
                 duration_hours: "{n}小时",
@@ -1353,6 +1463,45 @@ mod tests {
         assert_eq!(json["texts"]["quit"], "Quit");
         assert_eq!(json["texts"]["openMain"], "Open main window");
         assert_eq!(json["texts"]["lightweightMode"], "Lightweight mode");
+        assert_eq!(json["texts"]["tierDual"], "Both");
+        assert_eq!(json["texts"]["lockPosition"], "Lock position");
+        assert_eq!(json["texts"]["unlockPosition"], "Unlock position");
+        assert_eq!(json["texts"]["resetPosition"], "Reset position");
+        assert_eq!(json["texts"]["opacityLight"], "Sheer");
+        assert_eq!(json["texts"]["opacityBalanced"], "Balanced");
+        assert_eq!(json["texts"]["opacitySolid"], "Solid");
+        assert_eq!(json["texts"]["refreshing"], "Refreshing…");
+        assert_eq!(json["texts"]["updatedJustNow"], "Just updated");
+        assert_eq!(json["texts"]["updatedAgo"], "Updated {when} ago");
+    }
+
+    #[test]
+    fn all_eight_languages_populate_new_widget_panel_texts() {
+        let new_keys = [
+            "tierDual",
+            "lockPosition",
+            "unlockPosition",
+            "resetPosition",
+            "opacityLight",
+            "opacityBalanced",
+            "opacitySolid",
+            "refreshing",
+            "updatedJustNow",
+            "updatedAgo",
+        ];
+        for lang in ["en", "tr", "de", "ru", "ko", "ja", "zh-TW", "zh"] {
+            let json = serde_json::to_value(PanelTexts::from_language(lang)).unwrap();
+            for key in new_keys {
+                let value = json[key]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("missing key {key} for {lang}"));
+                assert!(!value.trim().is_empty(), "empty key {key} for {lang}");
+            }
+            assert!(
+                json["updatedAgo"].as_str().unwrap().contains("{when}"),
+                "updatedAgo for {lang} must include {{when}} placeholder"
+            );
+        }
     }
 
     #[test]

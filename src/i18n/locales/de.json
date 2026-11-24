@@ -468,6 +468,8 @@
       "trayStylePanel": "Panel",
       "trayStyleMenu": "Menü",
       "trayStyleHelp": "Was sich beim Klick auf das Tray-Symbol öffnet (unter Windows öffnet ein Linksklick immer das Hauptfenster und ein Rechtsklick den gewählten Stil). Panel: der aktive Anbieter, das Kontingent und die Nutzung jeder App, mit Suche und Wechsel. Menü: das native Systemmenü. Wirkt sofort.",
+      "quotaWidget": "Desktop-Nutzungs-Widget",
+      "quotaWidgetHelp": "Zeigt eine schwebende, immer im Vordergrund bleibende Karte auf dem Desktop an, die das Kontingent und die Rücksetzzeit des aktiven Anbieters jeder App anzeigt. Lässt sich auch über das Tray-Menü umschalten.",
       "minimizeToTrayHelp": "Wenn aktiviert, blendet die Schließen-Schaltfläche das Fenster nur aus und CC Switch läuft weiter im System-Tray (der Lightweight-Modus befindet sich im Tray-Menü). Wenn deaktiviert, beendet die Schließen-Schaltfläche die App.",
       "terminalHelp": "Das Terminal, das „Terminal öffnen“ auf Anbieterkarten verwendet. Ist es nicht verfügbar, wird das Standardterminal des Systems verwendet."
     },

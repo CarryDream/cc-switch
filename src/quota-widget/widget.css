@@ -1,4 +1,4 @@
-/* 一层 240px 卡片与原生材质同尺寸。只改变背景，不降低内容透明度。 */
+/* 独立轻量样式：不依赖主应用 index.css / Tailwind。窗口与卡片同尺寸，无外围画布。 */
 html,
 body.quota-widget,
 body.quota-widget #root {
@@ -8,6 +8,10 @@ body.quota-widget #root {
   height: 100%;
   overflow: hidden;
   background: transparent !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 body.quota-widget {
@@ -17,113 +21,225 @@ body.quota-widget {
 }
 
 .qw-card {
-  --qw-ink: #19212c;
-  --qw-muted: #465365;
-  --qw-normal: #0369a1;
-  --qw-normal-light: #38bdf8;
-  --qw-warning: #a75109;
-  --qw-warning-light: #fcd34d;
-  --qw-danger: #b91c1c;
-  --qw-danger-light: #fca5a5;
-  --qw-surface: rgba(246, 249, 253, 0.84);
-  --qw-idle: 0.84;
-  --qw-hover: 0.88;
+  --qw-ink: #18202c;
+  --qw-muted: #526072;
+  --qw-divider: rgba(15, 23, 42, 0.08);
+  --qw-pill-bg: rgba(15, 23, 42, 0.06);
+  --qw-pill-active-bg: rgba(255, 255, 255, 0.72);
+  --qw-pill-active-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08), inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
+  --qw-groove-base: rgba(15, 23, 42, 0.06);
+  --qw-groove-shadow:
+    inset 0 0.5px 1px rgba(15, 23, 42, 0.14),
+    0 0.5px 0 rgba(255, 255, 255, 0.45);
+  --qw-marker-ring: rgba(246, 249, 253, 0.92);
+  --qw-menu-bg: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(246, 249, 254, 0.88) 100%
+  );
+  --qw-menu-border: rgba(255, 255, 255, 0.72);
+  --qw-menu-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08),
+    inset 0 0 0 0.5px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  /* 五档健康色阶（充裕绿 → 海蓝 → 琥珀 → 橙红 → 深红）+ 每周专属靛紫 */
+  --qw-high: #0f9d68;
+  --qw-high-grad: linear-gradient(90deg, #0d9488 0%, #10b981 100%);
+  --qw-mid: #0284c7;
+  --qw-mid-grad: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
+  --qw-low: #d97706;
+  --qw-low-grad: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
+  --qw-warning: #ea580c;
+  --qw-warning-grad: linear-gradient(90deg, #ea580c 0%, #fb923c 100%);
+  --qw-danger: #dc2626;
+  --qw-danger-grad: linear-gradient(90deg, #b91c1c 0%, #ef4444 100%);
+  --qw-weekly: #5b50d6;
+  --qw-weekly-high-grad: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+  --qw-weekly-mid-grad: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
+  --qw-balance: #15803d;
+  --qw-idle: 0.86;
+  --qw-hover: 0.94;
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  width: min(240px, 100vw);
-  min-height: 40px;
-  max-height: 380px;
-  padding: 9px 11px;
-  overflow: auto;
+  gap: 4.5px;
+  width: min(296px, 100vw);
+  min-height: 32px;
+  max-height: 360px;
+  padding: 7px 11px 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--qw-ink);
   background: rgba(246, 249, 253, var(--qw-idle));
-  /* 顶部高光 + 底部暗边，画出玻璃厚度；阴影只做内发光，不外扩画布。 */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.08),
-    inset 0 0 18px rgba(255, 255, 255, 0.18);
+    inset 0 0 0 0.5px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.08);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   transition:
-    background 180ms ease,
-    box-shadow 180ms ease;
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+/* 行数极少（<= 2 行）且打开浮层菜单时留足展示空间；3 行以上维持原高度不跳动 */
+.qw-card[data-menu-pad="true"] {
+  min-height: 156px;
+}
+
+.qw-card[data-opacity="light"] {
+  --qw-idle: 0.68;
+  --qw-hover: 0.82;
+}
+.qw-card[data-opacity="solid"] {
+  --qw-idle: 0.97;
+  --qw-hover: 0.99;
+}
+
+.qw-card[data-active="true"] {
+  scrollbar-color: rgba(120, 130, 145, 0.35) transparent;
+}
+.qw-card::-webkit-scrollbar {
+  width: 4px;
+}
+.qw-card::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: transparent;
+}
+.qw-card[data-active="true"]::-webkit-scrollbar-thumb {
+  background: rgba(120, 130, 145, 0.35);
 }
 
 html.dark .qw-card {
-  --qw-ink: #f1f4f9;
-  --qw-muted: #c3ccd8;
-  --qw-normal: #38bdf8;
-  --qw-normal-light: #bae6fd;
-  --qw-warning: #fbbf24;
-  --qw-warning-light: #fef08a;
+  --qw-ink: #eef2f7;
+  --qw-muted: #b4c0d0;
+  --qw-divider: rgba(255, 255, 255, 0.1);
+  --qw-pill-bg: rgba(255, 255, 255, 0.08);
+  --qw-pill-active-bg: rgba(255, 255, 255, 0.18);
+  --qw-pill-active-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.24), inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+  --qw-groove-base: rgba(255, 255, 255, 0.05);
+  --qw-groove-shadow:
+    inset 0 0.5px 1px rgba(0, 0, 0, 0.36), 0 0.5px 0 rgba(255, 255, 255, 0.12);
+  --qw-marker-ring: rgba(22, 28, 38, 0.94);
+  --qw-menu-bg: linear-gradient(
+    165deg,
+    rgba(34, 42, 56, 0.92) 0%,
+    rgba(20, 25, 35, 0.9) 100%
+  );
+  --qw-menu-border: rgba(255, 255, 255, 0.22);
+  --qw-menu-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --qw-high: #34d399;
+  --qw-high-grad: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  --qw-mid: #38bdf8;
+  --qw-mid-grad: linear-gradient(90deg, #0ea5e9 0%, #7dd3fc 100%);
+  --qw-low: #fbbf24;
+  --qw-low-grad: linear-gradient(90deg, #f59e0b 0%, #fde047 100%);
+  --qw-warning: #fb923c;
+  --qw-warning-grad: linear-gradient(90deg, #f97316 0%, #fdba74 100%);
   --qw-danger: #f87171;
-  --qw-danger-light: #fecaca;
-  --qw-surface: rgba(24, 29, 38, 0.86);
-  --qw-idle: 0.86;
-  --qw-hover: 0.89;
+  --qw-danger-grad: linear-gradient(90deg, #ef4444 0%, #fca5a5 100%);
+  --qw-weekly: #a5b4fc;
+  --qw-weekly-high-grad: linear-gradient(90deg, #6366f1 0%, #a78bfa 100%);
+  --qw-weekly-mid-grad: linear-gradient(90deg, #818cf8 0%, #c4b5fd 100%);
+  --qw-balance: #4ade80;
+  --qw-idle: 0.88;
+  --qw-hover: 0.95;
   background: rgba(24, 29, 38, var(--qw-idle));
   box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
-    inset 0 0 22px rgba(148, 197, 255, 0.1);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
 }
 
-/* 液态玻璃（激进版）：DWM/AppKit 只给透明，模糊由 backdrop-filter 全权负责。
-   浅色 = 冰玻璃，深色 = 烟玻璃；idle 几乎纯透，hover 才略实。
-   关键：backdrop-filter 模糊半径要大（24px），底色要极低，让桌面背景"流"进来。 */
+html.dark .qw-card[data-opacity="light"] {
+  --qw-idle: 0.7;
+  --qw-hover: 0.84;
+}
+html.dark .qw-card[data-opacity="solid"] {
+  --qw-idle: 0.97;
+  --qw-hover: 0.99;
+}
+
+/* 原生桌面玻璃（Apple Liquid Glass 风格）：macOS 背后是 NSGlassEffectView / NSVisualEffectView，
+   Windows 11 背后是 DWM 原生 Acrylic（DWMSBT_TRANSIENTWINDOW）。低不透明度着色让桌面光色自然透出，
+   叠加精致折射高光边与文字微护底，通透不发灰。 */
 html[data-glass="acrylic"] .qw-card,
 html[data-glass="native"] .qw-card {
-  --qw-idle: 0.38;
-  --qw-hover: 0.48;
+  --qw-divider: rgba(15, 23, 42, 0.09);
+  --qw-pill-bg: rgba(15, 23, 42, 0.065);
+  --qw-idle: 0.24;
+  --qw-hover: 0.34;
   background:
     linear-gradient(
       160deg,
-      rgba(255, 255, 255, 0.46) 0%,
-      rgba(191, 219, 254, 0.18) 38%,
-      rgba(255, 255, 255, 0.06) 100%
+      rgba(255, 255, 255, 0.34) 0%,
+      rgba(255, 255, 255, 0.08) 32%,
+      rgba(255, 255, 255, 0.02) 100%
     ),
-    rgba(226, 236, 248, var(--qw-idle));
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    rgba(248, 250, 254, var(--qw-idle));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.12),
-    inset 0 0 28px rgba(255, 255, 255, 0.35);
-  /* 玻璃态下文字加一道柔光，让它从模糊背景里立起来 */
-  text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.55),
-    0 1px 2px rgba(255, 255, 255, 0.3);
-}
-html.dark[data-glass="acrylic"] .qw-card,
-html.dark[data-glass="native"] .qw-card {
-  --qw-idle: 0.42;
-  --qw-hover: 0.52;
-  background:
-    linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.16) 0%,
-      rgba(56, 89, 145, 0.22) 38%,
-      rgba(0, 0, 0, 0.26) 100%
-    ),
-    rgba(13, 19, 30, var(--qw-idle));
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    inset 0 0 28px rgba(125, 178, 255, 0.18);
-  text-shadow:
-    0 0 8px rgba(0, 0, 0, 0.6),
-    0 1px 3px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.52),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.88),
+    inset 1px 0 0 rgba(255, 255, 255, 0.36),
+    inset 0 -1px 1px rgba(15, 23, 42, 0.08);
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.65);
 }
 
-/* Windows 的系统圆角和网页圆角一致，没有外围留白。 */
+html[data-glass="acrylic"] .qw-card[data-opacity="light"],
+html[data-glass="native"] .qw-card[data-opacity="light"] {
+  --qw-idle: 0.12;
+  --qw-hover: 0.22;
+}
+html[data-glass="acrylic"] .qw-card[data-opacity="solid"],
+html[data-glass="native"] .qw-card[data-opacity="solid"] {
+  --qw-idle: 0.78;
+  --qw-hover: 0.86;
+}
+
+html.dark[data-glass="acrylic"] .qw-card,
+html.dark[data-glass="native"] .qw-card {
+  --qw-divider: rgba(255, 255, 255, 0.11);
+  --qw-pill-bg: rgba(255, 255, 255, 0.09);
+  --qw-idle: 0.28;
+  --qw-hover: 0.38;
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.03) 34%,
+      rgba(255, 255, 255, 0.01) 100%
+    ),
+    rgba(16, 22, 33, var(--qw-idle));
+  box-shadow:
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.14),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html.dark[data-glass="acrylic"] .qw-card[data-opacity="light"],
+html.dark[data-glass="native"] .qw-card[data-opacity="light"] {
+  --qw-idle: 0.16;
+  --qw-hover: 0.26;
+}
+html.dark[data-glass="acrylic"] .qw-card[data-opacity="solid"],
+html.dark[data-glass="native"] .qw-card[data-opacity="solid"] {
+  --qw-idle: 0.78;
+  --qw-hover: 0.86;
+}
+
+/* Windows 的系统圆角（8px）与 DWM DWMWCP_ROUND 对齐，没有外围留白。 */
 html[data-platform="windows"] .qw-card {
   border-radius: 8px;
 }
@@ -131,93 +247,158 @@ html[data-platform="windows"] .qw-card {
 .qw-card[data-active="true"] {
   background: rgba(246, 249, 253, var(--qw-hover));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.1),
-    inset 0 0 26px rgba(255, 255, 255, 0.32);
+    inset 0 0 0 0.5px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.1);
 }
 html.dark .qw-card[data-active="true"] {
   background: rgba(24, 29, 38, var(--qw-hover));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.42),
-    inset 0 0 28px rgba(148, 197, 255, 0.2);
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }
 
-/* 原生玻璃态下的 hover：在着色层上把 idle → hover 的差距拉开，
-   并加一道对角掠光，模拟液态玻璃被"点亮"的瞬间。 */
 html[data-glass="acrylic"] .qw-card[data-active="true"],
 html[data-glass="native"] .qw-card[data-active="true"] {
   background:
     linear-gradient(
       160deg,
-      rgba(255, 255, 255, 0.58) 0%,
-      rgba(191, 219, 254, 0.24) 38%,
-      rgba(255, 255, 255, 0.08) 100%
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.12) 34%,
+      rgba(255, 255, 255, 0.04) 100%
     ),
-    rgba(226, 236, 248, var(--qw-hover));
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+    rgba(248, 250, 254, var(--qw-hover));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.14),
-    inset 0 0 36px rgba(255, 255, 255, 0.5);
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.68),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.96),
+    inset 1px 0 0 rgba(255, 255, 255, 0.48),
+    inset 0 -1px 1px rgba(15, 23, 42, 0.1);
 }
 html.dark[data-glass="acrylic"] .qw-card[data-active="true"],
 html.dark[data-glass="native"] .qw-card[data-active="true"] {
   background:
     linear-gradient(
       160deg,
-      rgba(255, 255, 255, 0.22) 0%,
-      rgba(96, 145, 220, 0.28) 38%,
-      rgba(0, 0, 0, 0.24) 100%
+      rgba(255, 255, 255, 0.17) 0%,
+      rgba(255, 255, 255, 0.05) 36%,
+      rgba(255, 255, 255, 0.02) 100%
     ),
-    rgba(13, 19, 30, var(--qw-hover));
-  backdrop-filter: blur(28px) saturate(1.6);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+    rgba(16, 22, 33, var(--qw-hover));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    inset 0 0 36px rgba(147, 197, 253, 0.28);
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.22),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.38),
+    inset 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.42);
 }
 
 .qw-row {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 4px;
+  gap: 2.5px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+.qw-row-dim {
+  opacity: 0.56;
 }
 .qw-row-head {
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 13px;
+  min-height: 12px;
 }
 .qw-app-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
   flex: 1;
   min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.qw-name-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.3;
+}
+.qw-app-tag {
+  flex-shrink: 0;
+  padding: 0 3.5px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--qw-muted);
+  background: var(--qw-pill-bg);
+}
+.qw-chevron {
+  flex-shrink: 0;
+  color: var(--qw-muted);
+  opacity: 0;
+  transform: rotate(0deg);
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+.qw-row:hover .qw-chevron,
+.qw-row[data-expanded="true"] .qw-chevron {
+  opacity: 0.65;
+}
+.qw-row[data-expanded="true"] .qw-chevron {
+  transform: rotate(90deg);
 }
 .qw-reset {
   flex-shrink: 0;
-  padding: 1px 4px;
-  border-radius: 4px;
-  font-size: 9px;
-  line-height: 1.2;
+  padding: 0.5px 4.5px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 500;
+  line-height: 1.25;
   color: var(--qw-muted);
-  background: rgba(128, 140, 160, 0.1);
+  background: var(--qw-pill-bg);
+}
+.qw-tier-badge {
+  flex-shrink: 0;
+  padding: 0 3.5px;
+  border-radius: 3px;
+  border: 1px solid var(--qw-divider);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: var(--qw-muted);
+  background: var(--qw-pill-bg);
 }
 .qw-pct {
   flex-shrink: 0;
   min-width: 28px;
   text-align: end;
   font-size: 10px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.qw-value {
+  flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: end;
+  font-size: 9.5px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.2;
+  color: var(--qw-muted);
+}
+.qw-balance {
+  color: var(--qw-balance);
+}
+.qw-low {
+  color: var(--qw-low);
 }
 .qw-warn {
   color: var(--qw-warning);
@@ -226,89 +407,314 @@ html.dark[data-glass="native"] .qw-card[data-active="true"] {
   color: var(--qw-danger);
 }
 
-/* 所有行相同的 4px 槽，周端点在填充之上，不会被满额的 5h 条覆盖。 */
+/* 4px 精致微凹玻璃胶囊槽：按余量五档渐变着色，周游标上下微凸出 1px 更清晰可读。 */
 .qw-bar-track {
-  --qw-track-color: var(--qw-normal);
+  --qw-track-color: var(--qw-mid);
   position: relative;
   height: 4px;
   min-height: 4px;
   width: 100%;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--qw-track-color) 15%, transparent);
-  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(
+    in srgb,
+    var(--qw-track-color) 16%,
+    var(--qw-groove-base)
+  );
+  box-shadow: var(--qw-groove-shadow);
+  overflow: visible;
   isolation: isolate;
 }
-.qw-bar-track[data-status="warn"] {
+.qw-bar-track[data-tone="high"] {
+  --qw-track-color: var(--qw-high);
+}
+.qw-bar-track[data-tone="mid"] {
+  --qw-track-color: var(--qw-mid);
+}
+.qw-bar-track[data-tone="low"] {
+  --qw-track-color: var(--qw-low);
+}
+.qw-bar-track[data-tone="warn"] {
   --qw-track-color: var(--qw-warning);
 }
-.qw-bar-track[data-status="danger"] {
+.qw-bar-track[data-tone="danger"] {
   --qw-track-color: var(--qw-danger);
+}
+.qw-bar-track[data-variant="weekly"][data-tone="high"],
+.qw-bar-track[data-variant="weekly"][data-tone="mid"] {
+  --qw-track-color: var(--qw-weekly);
+}
+.qw-bar-track[data-status="danger"] {
   /* 即使 5h 还满着，也明确表示整行不可用，不能看起来是一根健康的满条。 */
   box-shadow: inset 0 0 0 1px var(--qw-danger);
 }
+
 .qw-bar-fill {
   position: absolute;
   inset: 0;
   z-index: 0;
+  border-radius: 999px;
   transform-origin: left center;
-  background: var(--qw-normal);
+  background: var(--qw-mid-grad);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.42);
   pointer-events: none;
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 200ms ease,
+    opacity 180ms ease;
 }
-.qw-bar-fill[data-status="warn"] {
-  background: var(--qw-warning);
+.qw-bar-fill[data-tone="high"] {
+  background: var(--qw-high-grad);
 }
-.qw-bar-fill[data-status="danger"] {
-  background: var(--qw-danger);
+.qw-bar-fill[data-tone="mid"] {
+  background: var(--qw-mid-grad);
+}
+.qw-bar-fill[data-tone="low"] {
+  background: var(--qw-low-grad);
+}
+.qw-bar-fill[data-tone="warn"] {
+  background: var(--qw-warning-grad);
+}
+.qw-bar-fill[data-tone="danger"] {
+  background: var(--qw-danger-grad);
+}
+.qw-bar-fill[data-variant="weekly"][data-tone="high"] {
+  background: var(--qw-weekly-high-grad);
+}
+.qw-bar-fill[data-variant="weekly"][data-tone="mid"] {
+  background: var(--qw-weekly-mid-grad);
 }
 .qw-bar-track[data-status="danger"] .qw-bar-fill[data-status="normal"] {
-  opacity: 0.3;
+  opacity: 0.28;
 }
+
 .qw-week-marker {
   position: absolute;
   z-index: 1;
-  top: 0;
-  bottom: 0;
-  left: clamp(0px, calc(var(--week-position) - 2px), calc(100% - 4px));
-  width: 4px;
-  border-radius: 1px;
-  background: var(--qw-normal-light);
-  box-shadow: 0 0 0 1px var(--qw-ink);
+  top: -1px;
+  bottom: -1px;
+  left: clamp(0px, calc(var(--week-position) - 1.5px), calc(100% - 3px));
+  width: 3px;
+  border-radius: 999px;
+  background: var(--qw-weekly);
+  box-shadow: 0 0 0 1.25px var(--qw-marker-ring);
   pointer-events: none;
+  transition:
+    left 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 200ms ease;
 }
-.qw-week-marker[data-status="warn"] {
-  background: var(--qw-warning-light);
+.qw-week-marker[data-tone="low"] {
+  background: var(--qw-low);
 }
-.qw-week-marker[data-status="danger"] {
+.qw-week-marker[data-tone="warn"] {
+  background: var(--qw-warning);
+}
+.qw-week-marker[data-tone="danger"] {
   background: var(--qw-danger);
 }
 
-.qw-legend {
+/* 单击展开的行内详情抽屉：grid-template-rows 0fr -> 1fr 平滑展开 */
+.qw-detail-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 160ms ease;
+}
+.qw-detail-wrap[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.qw-detail-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.qw-detail {
   display: flex;
-  justify-content: flex-end;
-  gap: 9px;
-  font-size: 8px;
-  line-height: 1.2;
+  flex-direction: column;
+  gap: 2.5px;
+  margin-top: 2px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--qw-pill-bg);
+  font-size: 9px;
+  line-height: 1.3;
+}
+.qw-detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+.qw-detail-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--qw-ink);
+  font-weight: 500;
+}
+.qw-detail-reset {
+  flex-shrink: 0;
+  font-size: 8.5px;
   color: var(--qw-muted);
 }
-.qw-legend > span {
+.qw-detail-val {
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: end;
+  font-weight: 600;
+}
+.qw-detail-meta {
+  font-size: 8.5px;
+  color: var(--qw-muted);
+}
+.qw-detail-note {
+  font-size: 8.5px;
+  color: var(--qw-muted);
+  word-break: break-word;
+}
+.qw-detail-error {
+  color: var(--qw-warning);
+}
+
+/* 底部工具栏：左侧状态圆点与锁定指示，右侧「双轨 / 5 小时 / 每周」三态玻璃胶囊切换 */
+.qw-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
+  padding-top: 4px;
+  border-top: 1px solid var(--qw-divider);
+}
+.qw-footer-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.qw-status-dot {
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: var(--qw-muted);
+  opacity: 0.38;
+  flex-shrink: 0;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease;
+}
+.qw-status-dot-busy {
+  background: var(--qw-mid);
+  opacity: 0.92;
+  animation: qw-pulse 1.1s ease-in-out infinite;
+}
+.qw-status-corner {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  pointer-events: auto;
+}
+@keyframes qw-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+.qw-lock-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--qw-muted);
+  background: var(--qw-pill-bg);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+.qw-lock-btn:hover,
+.qw-lock-btn:focus-visible {
+  outline: none;
+  color: var(--qw-ink);
+  background: var(--qw-pill-active-bg);
+  box-shadow: var(--qw-pill-active-shadow);
+}
+.qw-tier-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.qw-tier-btn {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  border: 0;
+  border-radius: 999px;
+  padding: 1.5px 6px;
+  font: inherit;
+  font-size: 8.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--qw-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+.qw-tier-btn:hover,
+.qw-tier-btn:focus-visible {
+  outline: none;
+  color: var(--qw-ink);
+  background: var(--qw-pill-bg);
+}
+.qw-tier-btn[data-selected="true"] {
+  color: var(--qw-ink);
+  font-weight: 600;
+  background: var(--qw-pill-active-bg);
+  box-shadow: var(--qw-pill-active-shadow);
+}
+.qw-tier-btn[data-muted="true"] {
+  opacity: 0.55;
+}
+.qw-tier-btn[data-muted="true"]:hover {
+  opacity: 0.92;
 }
 .qw-key-fill {
-  width: 9px;
+  width: 7.5px;
   height: 3px;
-  background: var(--qw-normal);
+  border-radius: 999px;
+  background: var(--qw-high-grad);
 }
 .qw-key-marker {
-  width: 3px;
-  height: 5px;
-  background: var(--qw-normal-light);
-  box-shadow: 0 0 0 0.5px var(--qw-muted);
+  width: 2.5px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--qw-weekly);
 }
+
 .qw-attention {
-  width: 5px;
-  height: 5px;
+  width: 4.5px;
+  height: 4.5px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--qw-warning);
@@ -319,13 +725,153 @@ html.dark[data-glass="native"] .qw-card[data-active="true"] {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 9px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--qw-muted);
 }
+
+.qw-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 .qw-skel {
-  height: 8px;
+  height: 6px;
   border-radius: 4px;
-  background: rgba(127, 127, 127, 0.18);
+  background: rgba(127, 127, 127, 0.2);
+}
+.qw-skel-md {
+  width: 66%;
+}
+.qw-skel-lg {
+  width: 100%;
+}
+.qw-skel-sm {
+  width: 50%;
+}
+
+/* 右键悬浮 Liquid Glass 浮层菜单：叠加在卡片内部，3–4 行时零窗口高度跳动 */
+.qw-menu {
+  position: absolute;
+  top: 5px;
+  left: 7px;
+  right: 7px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+  max-height: calc(100% - 10px);
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--qw-menu-border);
+  background: var(--qw-menu-bg);
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  box-shadow: var(--qw-menu-shadow);
+  text-shadow: none;
+}
+html[data-platform="windows"] .qw-menu {
+  border-radius: 7px;
+}
+.qw-menu-item {
+  appearance: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 7px;
+  text-align: start;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--qw-ink);
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.qw-menu-item:hover,
+.qw-menu-item:focus-visible {
+  outline: none;
+  background: var(--qw-pill-bg);
+}
+.qw-menu-opacity {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 1.5px;
+  border-radius: 6px;
+  background: var(--qw-pill-bg);
+}
+.qw-opacity-pill {
+  appearance: none;
+  border: 0;
+  border-radius: 4.5px;
+  padding: 2.5px 4px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--qw-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+.qw-opacity-pill:hover,
+.qw-opacity-pill:focus-visible {
+  outline: none;
+  color: var(--qw-ink);
+}
+.qw-opacity-pill[data-selected="true"] {
+  color: var(--qw-ink);
+  font-weight: 600;
+  background: var(--qw-pill-active-bg);
+  box-shadow: var(--qw-pill-active-shadow);
+}
+.qw-menu-sep {
+  height: 1px;
+  margin: 1.5px 4px;
+  background: var(--qw-divider);
+}
+.qw-menu-danger {
+  color: var(--qw-danger);
+}
+
+.qw-error-fallback {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.qw-retry-btn {
+  appearance: none;
+  border: 1px solid var(--qw-divider);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10px;
+  color: var(--qw-ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qw-card,
+  .qw-row,
+  .qw-chevron,
+  .qw-detail-wrap,
+  .qw-bar-fill,
+  .qw-week-marker,
+  .qw-tier-btn,
+  .qw-status-dot,
+  .qw-lock-btn,
+  .qw-menu-item,
+  .qw-opacity-pill {
+    transition: none;
+    animation: none;
+  }
 }
 
 @media (forced-colors: active) {
