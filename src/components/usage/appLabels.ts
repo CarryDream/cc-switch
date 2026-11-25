@@ -43,6 +43,7 @@ const APP_SHORT_NAME: Record<AppId, string> = {
   omp: "omp",
   copilot: "Copilot",
   workbuddy: "WorkBuddy",
+  codebuddy: "CodeBuddy",
 };
 
 /** 没有品牌图标的应用在筛选条里显示的两位字母标记。 */

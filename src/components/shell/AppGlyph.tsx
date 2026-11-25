@@ -21,6 +21,7 @@ export const APP_DISPLAY_NAME: Record<AppId, string> = {
   omp: "Oh My Pi",
   copilot: "Copilot CLI",
   workbuddy: "WorkBuddy",
+  codebuddy: "CodeBuddy",
 };
 
 /** 只在用量页出现、尚未接入应用管理（没有 `AppId`）但有品牌图标的客户端。 */
@@ -44,6 +45,7 @@ const APP_ICON_NAME: Record<AppGlyphId, string> = {
   omp: "omp",
   copilot: "githubcopilot",
   workbuddy: "workbuddy",
+  codebuddy: "codebuddy",
   droid: "factory",
 };
 

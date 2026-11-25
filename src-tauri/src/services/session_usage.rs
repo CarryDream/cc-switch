@@ -195,6 +195,10 @@ pub fn sync_all_unlocked(db: &Database) -> SessionSyncResult {
                 crate::services::session_usage_droid::sync_droid_usage(db)
             }),
             (
+                "CodeBuddy",
+                crate::services::session_usage_codebuddy::sync_codebuddy_usage,
+            ),
+            (
                 "DeepSeek Harness",
                 crate::services::session_usage_dsh::sync_dsh_usage,
             ),
