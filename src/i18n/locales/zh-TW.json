@@ -1026,6 +1026,7 @@
     "browsePlaceholderPi": "例如：/home/<您的帳號>/.pi/agent",
     "browsePlaceholderOmp": "例如：/home/<您的帳號>/.omp/agent",
     "browsePlaceholderDsh": "例如：/home/<您的帳號>/.dsh",
+    "browsePlaceholderZcode": "例如：/home/<您的帳號>/.zcode",
     "browseDirectory": "瀏覽目錄",
     "resetDefault": "還原預設目錄（需儲存後生效）",
     "checkForUpdates": "檢查更新",
@@ -1550,6 +1551,7 @@
     "selectSessionLabel": "選擇 {{title}}",
     "mcodeDeleteHint": "請在 MiniMax Code 中刪除",
     "codebuddyDeleteHint": "請在 CodeBuddy 中管理此會話：背景任務、團隊成員和檔案歷史都引用它的記錄",
+    "zcodeDeleteHint": "請在 ZCode 中刪除此會話，以保持會話歷史和用量記錄一致",
     "agyDeleteHint": "請在 Antigravity 中刪除工作階段，以同步清理執行狀態",
     "groupMeta": "{{count}} 個工作階段 · {{time}}",
     "bucketToday": "今天",
@@ -1754,7 +1756,6 @@
       "filterChanges": "變更",
       "filterLabel": "檢視",
       "exportMarkdown": "匯出為 Markdown 檔案",
-      "exportShort": "匯出",
       "exported": "已匯出到 {{path}}",
       "exportFailed": "匯出失敗：{{error}}",
       "conversationRegion": "對話內容",
@@ -1817,7 +1818,8 @@
       "tokenplus": "TokenPlus，讓 AI 程式開發更穩、更省、更省心：一個 Key 暢用多家模型，智慧切換保障穩定、價格優選與快取最佳化節省成本，帳單、團隊和資料安全一站管理。",
       "kimi": "Kimi 新使用者首次成功儲值，即可獲贈儲值金額 10% 的 API 額度，最高贈送 ¥1000。",
       "a6api": "A6API 是一家 Token 聚合站，內建即時價格排行自動篩選全網最低價，滑順穩定不卡頓，簡易操作省去比價繁瑣，註冊獲得體驗金！",
-      "sudocode": "SudoCode 讓 Claude Code 與 Claude Desktop 使用 Claude Opus 5，Codex 使用 GPT-5.6，一個 Key 統一管理。CC Switch 使用者註冊並加入 QQ 群 726213516，聯絡群主領取人民幣 ¥10 試用額度。",
+      "fastaitoken": "FastAIToken 提供 Claude、GPT、DeepSeek 一站式接入方案，最低 0.6 折，支援對公開票。",
+      "sudocode": "SudoCode 讓 Claude Code 與 Codex 共用一個 API 入口，主控台依模型列出每次請求的 Token 用量與費用。CC Switch 使用者註冊後加入 QQ 群 1030742788，即可領取價值人民幣 ¥10 的日卡。",
       "packycode": "PackyCode 是 CC Switch 的官方合作夥伴，使用此連結註冊並在儲值時填寫「cc-switch」優惠碼，可以享受 9 折優惠",
       "apikeyfun": "APIKEY.FUN 為 CC Switch 的使用者提供了特別優惠，透過專屬連結註冊，可享受最高儲值永久 95 折優惠。",
       "apinebula": "APINEBULA 為 CC Switch 使用者提供特別優惠：使用專屬連結註冊並在儲值時填寫「ccswitch」優惠碼，可享 9 折優惠。",
@@ -2250,7 +2252,8 @@
     "autoReviewModelMainDefault": "主模型自己審批（預設）",
     "autoReviewModelNoList": "這張卡沒有模型列表：Codex 會用官方的 codex-auto-review 審批，只有部分轉發 ChatGPT 帳號的中轉認得它，不認就會回報 404。在上面的模型列表裡加上模型後就能選。",
     "officialSpeedTiersLabel": "保留官方 Fast 檔",
-    "officialSpeedTiersHint": "讓模型列表裡的 GPT 模型保留官方的 Fast 速度檔，Codex 選了 Fast 後請求會帶 service_tier=priority。只有轉發官方 ChatGPT 帳號的中轉（如 CPA）才認得，會更快消耗額度；其他上游可能報錯或按更高價計費。開啟後，先前在官方卡下選過的 Fast 會立刻在這家生效。聚合模式下不生效。改完需要重新啟動 Codex。",
+    "officialSpeedTiersHint": "讓模型列表裡的 GPT 模型保留官方的 Fast 速度檔，Codex 選了 Fast 後請求會帶 service_tier=priority。只有轉發官方 ChatGPT 帳號的中轉（如 CPA）才認得，會更快消耗額度；其他上游可能報錯或按更高價計費。Codex 桌面版要登入 ChatGPT 才顯示 Fast：在桌面版登入後，開啟設定裡的「非接管切換時保留官方登入」（或使用路由模式），請求仍發往這張卡；不登入時只有命令列版能用（/fast）。開啟後，先前在官方卡下選過的 Fast 會立刻在這家生效。聚合模式下不生效。改完需要重新啟動 Codex。",
+    "officialSpeedTiersNoList": "這張卡沒有模型列表：Fast 檔只加在模型列表裡的 GPT 模型上，所以現在打不開。在上面的模型列表裡加上 GPT 模型後才能開啟。",
     "modelListHint": "修改後需要重新啟動 Codex。",
     "modelListDefaultHelp": "這些模型會出現在 Codex 的 /model 裡，第一行是預設模型。名稱是官方 GPT 模型的行依官方條目產生，行裡的顯示名、視窗和思考等級不生效。",
     "addCatalogModel": "手動新增",
@@ -2782,6 +2785,7 @@
       "duration": "耗時",
       "durationEstimated": "耗時（估算）",
       "speedTooFew": "輸出不到 100 token，不算速度",
+      "speedBurst": "疑似緩衝後突發吐出，不算速度",
       "speedEstimateTooFew": "輸出不到 200 token，不估速度",
       "noTimingSession": "工作階段日誌沒有計時資料",
       "noFirstToken": "沒有首字計時，不算速度",
@@ -4432,6 +4436,7 @@
     "visibleHelp": "關掉後，這個應用不再出現在側欄、系統匣選單、MCP / Skills 的應用欄，以及提示詞和工作階段的應用下拉選單裡。只是不顯示：它的供應商、MCP 等設定都還在，它自己的設定檔也不會被改動。",
     "desktopHelp": "Claude Desktop 是桌面應用，不能在這裡安裝或升級；CC Switch 透過它的設定檔接入。",
     "workbuddyHelp": "WorkBuddy 是桌面應用程式，無法在這裡安裝或升級，它會自行更新；CC Switch 透過它的設定檔（~/.workbuddy/models.json）接入。",
+    "zcodeHelp": "ZCode 是桌面應用程式，無法在此安裝或升級，由它自行更新。CC Switch 透過設定檔（~/.zcode/v2/provider_config.json）與它對接。",
     "desktopUnsupported": "目前系統不支援",
     "desktopConnected": "已接入",
     "desktopNotConnected": "未接入",
@@ -4704,6 +4709,7 @@
     },
     "updatedAt": "{{time}}更新",
     "clickToRefresh": "點擊重新查詢",
+    "manualIdle": "點重新整理查詢額度",
     "resetCredits": {
       "label": "重設",
       "left": "重設剩餘 {{count}} 次",
@@ -4983,9 +4989,9 @@
       "disableAria": "在這個應用裡停用選中的 {{count}} 個 Skill",
       "uninstall": "解除安裝"
     },
-    "piColumnTitle": "Pi 按 ~/.pi/agent/skills 裡有沒有這個目錄來判斷",
+    "piColumnTitle": "Pi 會讀取 ~/.agents/skills，因此未勾選但存在於該路徑的 skills 仍可直接使用",
     "piHelpTitle": "Pi 怎麼算啟用",
-    "piHelp": "看 ~/.pi/agent/skills 裡有沒有這個目錄。",
+    "piHelp": "Pi 會讀取 ~/.agents/skills，因此未勾選但存在於該路徑的 skills 仍可直接使用。",
     "pop": {
       "onlyApp": "只看在 {{app}} 啟用的",
       "showAll": "顯示全部 Skill"
@@ -5215,10 +5221,10 @@
     "helpTitle": "授權中心是什麼",
     "group": {
       "helpTitle": "{{service}} 帳號怎麼用",
-      "copilotHelp": "用於 Claude Code、Claude Desktop 的 GitHub Copilot 預設。沒指定帳號的供應商用「預設」帳號。",
+      "copilotHelp": "用於 Claude Code、Claude Desktop、Codex 的 GitHub Copilot 預設，以及 Copilot CLI 官方登入綁定。沒指定帳號的供應商用「預設」帳號。",
       "chatgptHelp": "用於 Claude Code、Claude Desktop 的 ChatGPT 預設，以及 Codex 官方登入綁定。沒指定帳號的供應商用「預設」帳號。",
-      "xaiHelp": "用於 Claude Code、Claude Desktop、Codex 的 xAI 預設。沒指定帳號的供應商用「預設」帳號。",
-      "agyHelp": "Antigravity CLI（agy）的官方登入。agy 同時只能登入一個帳號，「切換」會把 agy 的登入換成選中的帳號，之後新開的 agy 都用它。agy 裡原本登入的帳號會自動收進這裡，切走也不會遺失。",
+      "xaiHelp": "用於 Claude Code、Claude Desktop、Codex 的 xAI 預設，以及 Grok Build 官方登入綁定。沒指定帳號的供應商用「預設」帳號。",
+      "agyHelp": "Antigravity CLI（agy）的官方登入。agy 同時只能登入一個帳號，「切換」會把 agy 的登入換成選中的帳號，之後新開的 agy 都用它。agy 裡原本登入的帳號會自動收進這裡，切走也不會遺失。「新增帳號」會開啟終端機執行 agy，在 agy 裡登入後這裡會自動收錄。額度用 agy 自己的 /usage 查詢，只查得到 agy 目前登入的帳號，其他帳號顯示切走前最後一次查到的。",
       "codebuddyHelp": "CodeBuddy 的官方登入（國內版、國際版都在這裡）。要切換帳號，請在帳號的「…」裡選「將 CodeBuddy 切換到這個帳號」，或在供應商列表裡新增綁定它的「CodeBuddy 官方登入」卡。「新增帳號」會開啟終端機執行 codebuddy，登入後這裡自動收錄；已登入時會先讓 CodeBuddy 暫時登出原來的帳號，放棄可恢復。權杖由 CodeBuddy 自己續期。",
       "workbuddyHelp": "WorkBuddy 桌面端的官方登入。CC Switch 不能替 WorkBuddy 登入，只能收錄它目前登入的帳號（整組登入檔案的快照）。要切換帳號，請在帳號的「…」裡選「將 WorkBuddy 切換到這個帳號」，或在供應商列表裡加入綁定它的「WorkBuddy 官方登入」卡（同一時間只有一張在「已加入」）。快照只在這台電腦上有效，不會隨雲端同步。",
       "claudeHelpTerminal": "Claude Code 的官方訂閱帳號（Pro / Max / Team）。設定裡覆寫了 Claude 設定目錄，切卡不會切換 Claude Code 的登入；在官方卡上選一個帳號，再從卡片「開啟終端機」使用。",
@@ -5275,10 +5281,13 @@
       "reauthNote": "登入憑證已失效，無法切換過去",
       "addedOn": "{{date}}新增",
       "statusLoadFailed": "無法讀取 Antigravity 帳號，請重試。",
-      "empty": "還沒有 Antigravity 帳號。agy 裡已登入的帳號會自動出現在這裡。",
+      "empty": "還沒有 Antigravity 帳號。agy 裡已登入的帳號會自動出現在這裡，也可以點「新增帳號」在 agy 裡登入。",
       "removeNote": "不會讓 agy 登出：agy 目前登入的帳號刪除後仍然可用。",
       "switched": "已切換，新開的 agy 會使用這個帳號。",
-      "switchedWhileRunning": "已切換。偵測到 agy 正在執行：已開啟的 agy 仍使用原帳號，還可能把原帳號寫回去，請結束後重新開啟。"
+      "switchedWhileRunning": "已切換。偵測到 agy 正在執行：已開啟的 agy 仍使用原帳號，還可能把原帳號寫回去，請結束後重新開啟。",
+      "pendingNote": "已在終端機開啟 agy。未登入時依提示登入；已登入時先輸入 /logout，再輸入 /login 登入要新增的帳號。完成後這裡會自動收錄。",
+      "reopenTerminal": "重新開啟終端機",
+      "quotaNotCurrent": "切換到這個帳號後才能查詢額度"
     },
     "codebuddy": {
       "mainland": "國內版",
@@ -5359,6 +5368,10 @@
     "openBrowser": {
       "title": "登入時自動開啟瀏覽器",
       "description": "關掉後只複製登入連結，由你自己選瀏覽器開啟，適合用獨立的瀏覽器環境管理多個帳號。"
+    },
+    "autoQuota": {
+      "title": "自動查詢額度",
+      "description": "關掉後，官方帳號的額度只在你點重新整理時查詢，開啟授權中心、卡片定時重新整理和懸停系統匣都不會自動去查。DeepSeek 帳號的餘額和登入狀態一起顯示，不受這個開關影響。"
     }
   },
   "kimi": {
@@ -5548,5 +5561,36 @@
     "hint": "可能由較新版本的 CC Switch 寫入。資料已原樣保留，無法編輯或啟用；升級後即可恢復，也可以刪除。",
     "confirmTitle": "刪除無法讀取的項目",
     "confirmMessage": "刪除「{{name}}」？只刪除 CC Switch 中的這筆記錄，不變更各應用自己的設定檔。"
+  },
+  "zcode": {
+    "addModel": "新增模型",
+    "apiKeyRequired": "API Key 不能為空",
+    "baseUrl": "基礎 URL",
+    "baseUrlHint": "自訂 API 端點位址",
+    "baseUrlRequired": "基礎 URL 不能為空",
+    "kind": "供應商類型",
+    "kindHint": "此供應商使用的 API 協定格式",
+    "kindPlaceholder": "選擇供應商類型",
+    "limitContext": "上下文",
+    "limitOutput": "輸出",
+    "modelId": "模型 ID",
+    "modelLimits": "Token 限制",
+    "modelLimitsHint": "留空則沿用 ZCode 的建議值。",
+    "models": "模型",
+    "modelsHint": "模型 ID 就是請求介面時傳送的模型名稱。",
+    "noModels": "未設定任何模型",
+    "providerKey": "供應商識別碼",
+    "providerKeyDuplicate": "此識別碼已被使用",
+    "providerKeyHint": "在 ~/.zcode/v2/provider_config.json 中的唯一識別碼。僅能使用字母、數字、冒號、底線和連字號。",
+    "providerKeyInvalid": "格式無效。僅能使用字母、數字、冒號、底線和連字號。",
+    "providerKeyLockedHint": "識別碼就是 provider_config.json 裡的 providerId，建立後不能再修改。",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyRequired": "供應商識別碼不能為空",
+    "providerKeyStatusLoading": "正在載入供應商識別碼狀態，請稍後再試",
+    "providerName": "供應商名稱",
+    "providerNameHint": "在 ZCode 中顯示的名稱",
+    "providerNamePlaceholder": "我的供應商",
+    "toggleModelDetails": "切換模型詳情",
+    "activationHint": "ZCode 的供應商是疊加式的：儲存後寫入 ZCode 的供應商清單，但需要在 ZCode 應用的供應商選擇器中手動切換到該供應商才會實際生效。"
   }
 }

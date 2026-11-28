@@ -22,6 +22,7 @@ export const APP_DISPLAY_NAME: Record<AppId, string> = {
   copilot: "Copilot CLI",
   workbuddy: "WorkBuddy",
   codebuddy: "CodeBuddy",
+  zcode: "ZCode",
 };
 
 /** 只在用量页出现、尚未接入应用管理（没有 `AppId`）但有品牌图标的客户端。 */
@@ -47,6 +48,7 @@ const APP_ICON_NAME: Record<AppGlyphId, string> = {
   workbuddy: "workbuddy",
   codebuddy: "codebuddy",
   droid: "factory",
+  zcode: "zcode",
 };
 
 export function hasAppGlyph(appType: string): appType is AppGlyphId {

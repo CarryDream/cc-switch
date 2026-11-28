@@ -44,6 +44,7 @@ const APP_SHORT_NAME: Record<AppId, string> = {
   copilot: "Copilot",
   workbuddy: "WorkBuddy",
   codebuddy: "CodeBuddy",
+  zcode: "ZCode",
 };
 
 /** 没有品牌图标的应用在筛选条里显示的两位字母标记。 */

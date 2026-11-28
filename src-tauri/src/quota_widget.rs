@@ -653,7 +653,14 @@ pub async fn quota_widget_agy_quota(
     {
         return Ok(cached);
     }
-    let result = crate::commands::agy_account::agy_quota(&state.0, None).await;
+    // 上游把 agy 额度查询改成「只问 agy 自己的 /usage」（一次要七八秒），并加了按账号的
+    // 复用窗口；悬浮窗有自己的 10 秒缓存，这里只要最短的复用，避免和主界面互相等锁。
+    let result = crate::commands::agy_account::agy_quota(
+        &state.0,
+        None,
+        crate::commands::agy_account::QUOTA_REUSE_INTERACTIVE,
+    )
+    .await;
     if let Ok(quota) = &result {
         if quota.success {
             app_state

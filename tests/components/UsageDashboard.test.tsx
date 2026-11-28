@@ -1,13 +1,18 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { APP_DISPLAY_NAME } from "@/components/shell/AppGlyph";
 import {
   UsageDashboard,
   resetUsageSyncClockForTests,
 } from "@/components/usage/UsageDashboard";
-import type { UsageRangeSelection } from "@/types/usage";
+import { USAGE_ONLY_APP_NAMES } from "@/components/usage/appLabels";
+import { APP_IDS } from "@/config/appSpecs";
+import type { AppId } from "@/lib/api/types";
+import type { VisibleApps } from "@/types";
+import { KNOWN_APP_TYPES, type UsageRangeSelection } from "@/types/usage";
 import { setSettings } from "../msw/state";
 import { createTestQueryClient } from "../utils/testQueryClient";
 
@@ -151,11 +156,14 @@ vi.mock("@/lib/query/proxy", () => ({
 
 const renderDashboard = (props: ComponentProps<typeof UsageDashboard> = {}) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <UsageDashboard {...props} />
-    </QueryClientProvider>,
-  );
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <UsageDashboard {...props} />
+      </QueryClientProvider>,
+    ),
+    queryClient,
+  };
 };
 
 const openSettings = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -417,6 +425,7 @@ describe("UsageDashboard", () => {
         copilot: false,
         workbuddy: false,
         codebuddy: false,
+        zcode: false,
       },
     });
     renderDashboard({ initialAppType: "gemini" });
@@ -437,6 +446,239 @@ describe("UsageDashboard", () => {
     expect(
       screen.queryByRole("button", { name: /Grok/ }),
     ).not.toBeInTheDocument();
+  });
+
+  const allFilterNames = () => {
+    const group = screen.getByRole("group", { name: "usage.appFilter.label" });
+    return within(group)
+      .getAllByRole("button")
+      .slice(1)
+      .map((button) => button.getAttribute("aria-label"));
+  };
+
+  const onlyVisibleApps = (...shown: AppId[]): VisibleApps =>
+    Object.fromEntries(
+      APP_IDS.map((id) => [id, shown.includes(id)]),
+    ) as VisibleApps;
+
+  // 只导入用量的应用（droid）不在「应用」页、不受 visibleApps 控制，筛选条里恒有；
+  // 下面按侧栏顺序断言的用例只关心受管应用，所以把它滤掉。
+  const usageOnlyNames = Object.values(USAGE_ONLY_APP_NAMES).map(
+    (entry) => entry.name,
+  );
+  const appFilterNames = () => {
+    const group = screen.getByRole("group", { name: "usage.appFilter.label" });
+    return within(group)
+      .getAllByRole("button")
+      .slice(1)
+      .map((button) => button.getAttribute("aria-label"))
+      .filter((name): name is string => name !== null && !usageOnlyNames.includes(name));
+  };
+
+  it("orders app filter chips in the default sidebar order before appOrder is customized", async () => {
+    setSettings({
+      visibleApps: onlyVisibleApps(
+        "claude",
+        "codex",
+        "grokbuild",
+        "opencode",
+        "agy",
+        "omp",
+        "workbuddy",
+        "codebuddy",
+      ),
+    });
+    renderDashboard();
+
+    const managed = APP_IDS.filter((id) =>
+      (KNOWN_APP_TYPES as readonly string[]).includes(id),
+    ).map((id) => APP_DISPLAY_NAME[id]);
+    // 只导入用量的应用（droid）不在「应用」页里，没有侧栏位次，固定排在最后
+    expect(appFilterNames()).toEqual(managed);
+    expect(allFilterNames()).toEqual([...managed, "Factory Droid"]);
+
+    await waitFor(() =>
+      expect(appFilterNames()).toEqual([
+        "Claude Code",
+        "Codex",
+        "Grok Build",
+        "OpenCode",
+        "Antigravity",
+        "Oh My Pi",
+        "WorkBuddy",
+        "CodeBuddy",
+      ]),
+    );
+  });
+
+  it("follows the app order dragged on the Apps page", async () => {
+    const moved = new Set(["agy", "workbuddy", "codebuddy", "claude"]);
+    setSettings({
+      visibleApps: onlyVisibleApps(
+        "claude",
+        "codex",
+        "grokbuild",
+        "opencode",
+        "agy",
+        "omp",
+        "workbuddy",
+        "codebuddy",
+      ),
+      appOrder: [
+        "future-app",
+        "agy",
+        "workbuddy",
+        "codebuddy",
+        ...APP_IDS.filter((app) => !moved.has(app)),
+        "claude",
+      ],
+    });
+    renderDashboard();
+
+    // Claude Desktop 已隐藏时，Claude Code 跟着自己被拖到的末尾位置走，不被隐藏的 Claude Desktop 钉在前面
+    await waitFor(() =>
+      expect(appFilterNames()).toEqual([
+        "Antigravity",
+        "WorkBuddy",
+        "CodeBuddy",
+        "Codex",
+        "Grok Build",
+        "OpenCode",
+        "Oh My Pi",
+        "Claude Code",
+      ]),
+    );
+  });
+
+  it("places the folded Claude chip at the visible Claude Desktop position when Claude Code is hidden", async () => {
+    setSettings({
+      visibleApps: onlyVisibleApps("claude-desktop", "codex", "agy"),
+      appOrder: [
+        "claude",
+        "codex",
+        "agy",
+        "claude-desktop",
+        ...APP_IDS.filter(
+          (app) => !["claude", "codex", "agy", "claude-desktop"].includes(app),
+        ),
+      ],
+    });
+    renderDashboard();
+
+    await waitFor(() =>
+      expect(appFilterNames()).toEqual(["Codex", "Antigravity", "Claude Code"]),
+    );
+  });
+
+  it("places the folded Claude chip at the earlier visible Claude entry when both are shown", async () => {
+    setSettings({
+      visibleApps: onlyVisibleApps("claude", "claude-desktop", "codex", "agy"),
+      appOrder: [
+        "codex",
+        "claude-desktop",
+        "agy",
+        "claude",
+        ...APP_IDS.filter(
+          (app) => !["codex", "claude-desktop", "agy", "claude"].includes(app),
+        ),
+      ],
+    });
+    renderDashboard();
+
+    await waitFor(() =>
+      expect(appFilterNames()).toEqual(["Codex", "Claude Code", "Antigravity"]),
+    );
+  });
+
+  it("keeps a hidden folded Claude selection at its earliest configured Claude position", async () => {
+    setSettings({
+      visibleApps: onlyVisibleApps("codex", "agy"),
+      appOrder: [
+        "codex",
+        "claude-desktop",
+        "agy",
+        "claude",
+        ...APP_IDS.filter(
+          (app) => !["codex", "claude-desktop", "agy", "claude"].includes(app),
+        ),
+      ],
+    });
+    renderDashboard({ initialAppType: "claude" });
+
+    await waitFor(() =>
+      expect(appFilterNames()).toEqual(["Codex", "Claude Code", "Antigravity"]),
+    );
+    expect(
+      screen.getByRole("button", { name: "Claude Code", pressed: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders only the All chip when no usage apps are visible", async () => {
+    setSettings({
+      visibleApps: onlyVisibleApps("openclaw", "hermes"),
+    });
+    renderDashboard();
+
+    await waitFor(() => expect(appFilterNames()).toEqual([]));
+    expect(
+      screen.getByRole("button", {
+        name: "usage.appFilter.all",
+        pressed: true,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("re-measures the sliding indicator when appOrder moves the active chip", async () => {
+    const offsetLeftSpy = vi
+      .spyOn(HTMLElement.prototype, "offsetLeft", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.tagName !== "BUTTON" || !this.parentElement) return 0;
+        const buttons = Array.from(
+          this.parentElement.querySelectorAll("button"),
+        );
+        const index = buttons.indexOf(this as HTMLButtonElement);
+        return index >= 0 ? index * 32 : 0;
+      });
+    try {
+      setSettings({
+        appOrder: ["agy", ...APP_IDS.filter((app) => app !== "agy")],
+      });
+      const { queryClient } = renderDashboard({ initialAppType: "agy" });
+
+      const group = screen.getByRole("group", {
+        name: "usage.appFilter.label",
+      });
+      const thumb = () => group.querySelector("span[aria-hidden='true']");
+      // settings 还没回来时 rank 为空，chip 按 KNOWN_APP_TYPES 的原序排（每项 32px，「全部」
+      // 在最前）。droid 不是受管应用，我们把它放在 KNOWN_APP_TYPES 最前，所以要剔掉再数下标。
+      const defaultAgyLeft =
+        (KNOWN_APP_TYPES.filter((app) => app !== "droid").indexOf("agy") + 1) * 32;
+      // settings 未回来前 agy 处于默认顺序位置；
+      // settings 回来后 agy 移到紧跟「全部」的第 1 个（1 * 32 = 32px），滑块需同步更新
+      expect(thumb()).toHaveStyle({ left: `${defaultAgyLeft}px` });
+      await waitFor(() => {
+        expect(appFilterNames()[0]).toBe("Antigravity");
+        expect(thumb()).toHaveStyle({ left: "32px" });
+      });
+
+      // 挂载后 appOrder 再次变化（如设置刷新），滑块也要跟着重算到第 2 个（2 * 32 = 64px）
+      setSettings({
+        appOrder: [
+          "codex",
+          "agy",
+          ...APP_IDS.filter((app) => app !== "codex" && app !== "agy"),
+        ],
+      });
+      await act(() =>
+        queryClient.invalidateQueries({ queryKey: ["settings"] }),
+      );
+      await waitFor(() => {
+        expect(appFilterNames().slice(0, 2)).toEqual(["Codex", "Antigravity"]);
+        expect(thumb()).toHaveStyle({ left: "64px" });
+      });
+    } finally {
+      offsetLeftSpy.mockRestore();
+    }
   });
 
   const scopeTrigger = () =>

@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { getCacheWriteAvailability, omitsCacheWrites } from "@/types/usage";
+import { APP_IDS } from "@/config/appSpecs";
+import {
+  KNOWN_APP_TYPES,
+  getCacheWriteAvailability,
+  omitsCacheWrites,
+  type AppType,
+} from "@/types/usage";
+
+describe("KNOWN_APP_TYPES", () => {
+  it("matches the default app order in APP_IDS", () => {
+    // droid 只导入用量、不是受管应用（没有 AppId），不在 APP_IDS 里，固定排在最后
+    const managed = KNOWN_APP_TYPES.filter((app): app is AppType =>
+      (APP_IDS as readonly string[]).includes(app),
+    );
+    expect(managed).toEqual(
+      APP_IDS.filter((app) => (KNOWN_APP_TYPES as readonly string[]).includes(app)),
+    );
+    expect(KNOWN_APP_TYPES.filter((app) => !managed.includes(app))).toEqual([
+      "droid",
+    ]);
+  });
+});
 
 describe("getCacheWriteAvailability", () => {
   it("distinguishes cache-write support across fixed protocols", () => {

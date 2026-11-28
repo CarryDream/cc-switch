@@ -23,6 +23,7 @@ import _dmxapi from "./dmxapi.png";
 import _eflowcode from "./eflowcode.png";
 import _etok from "./etok.png";
 import _everyapi from "./everyapi.svg?url";
+import _fastaitoken from "./fastaitoken.png";
 import _fenno from "./fenno-icon.png";
 import _fluxa from "./fluxa.png";
 import _genesis from "./genesis.svg?url";
@@ -51,9 +52,11 @@ import _subrouter from "./subrouter.svg?url";
 import _sudocode from "./sudocode.png";
 import _sudocodeUs from "./sudocode-us.png";
 import _teamorouter from "./TeamoRouter-icon-dark.png";
+import _teleai from "./teleai.png";
 import _tuzi from "./tuzi.png";
 import _unity2 from "./unity2.png";
 import _xycai from "./xycai-icon.png";
+import _zcode from "./zcode.png";
 import _zetaapi from "./zetaapi-icon.png";
 
 export const icons: Record<string, string> = {
@@ -214,10 +217,13 @@ export const iconUrls: Record<string, string> = {
   subrouter: _subrouter,
   sudocode: _sudocode,
   "sudocode-us": _sudocodeUs,
+  fastaitoken: _fastaitoken,
   teamorouter: _teamorouter,
+  teleai: _teleai,
   tuzi: _tuzi,
   unity2: _unity2,
   xycai: _xycai,
+  zcode: _zcode,
   zetaapi: _zetaapi,
 };
 
